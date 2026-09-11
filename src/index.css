@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --bg-card: #ffffff;
+    --border-card: #e5e7eb;
+    --text-primary: #171717;
+  }
+
+  html, body {
+    background-color: #ffffff !important;
+    color: #171717 !important;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    color: #171717 !important;
+  }
+
+  p, span, div, label, input, select, textarea, button {
+    color-scheme: light;
+  }
+}
+
+/* Explicit card and panel rules for maximum crispness and contrast */
+.card-panel {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #171717 !important;
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Print styles for thermal receipts and invoices */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 8px;
+    background: white;
+    color: black;
+  }
+}
+

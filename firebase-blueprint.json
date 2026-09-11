@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "products": {
+      "title": "Products",
+      "description": "Clothing items with variants (sizes/colors) and prices"
+    },
+    "categories": {
+      "title": "Categories",
+      "description": "Product categories for apparel"
+    },
+    "brands": {
+      "title": "Brands",
+      "description": "Clothing brands and manufacturers"
+    },
+    "sales": {
+      "title": "Sales",
+      "description": "Orders and sales transactions"
+    },
+    "purchases": {
+      "title": "Purchases",
+      "description": "Stock inventory replenishment from suppliers"
+    },
+    "cashRegisters": {
+      "title": "Cash Registers",
+      "description": "Daily cash shifts"
+    },
+    "cashMovements": {
+      "title": "Cash Movements",
+      "description": "Inflow and outflow transactions"
+    },
+    "customers": {
+      "title": "Customers",
+      "description": "Client contact and purchasing records"
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "description": "Supplier contacts and terms"
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Store configuration and preferences"
+    },
+    "priceHistory": {
+      "title": "Price History",
+      "description": "Historical records of product price changes with reasons"
+    },
+    "costHistory": {
+      "title": "Cost History",
+      "description": "Historical records of product unit costs, quantities, and supplier purchases"
+    }
+  }
+}

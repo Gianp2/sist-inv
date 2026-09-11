@@ -1,0 +1,493 @@
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Filter, Shirt, Edit2, Trash2, Eye, Boxes, Download, RotateCcw, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { useProducts } from '../../hooks/useProducts';
+import { useCategories, useBrands } from '../../hooks/useCatalog';
+import { ProductFormModal } from './ProductFormModal';
+import { ProductDetailModal } from './ProductDetailModal';
+import { InventoryAdvancedFilters } from './InventoryAdvancedFilters';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { TableSkeleton } from '../../components/ui/Skeleton';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { formatCurrency } from '../../utils/formatters';
+import { exportToExcel } from '../../utils/exportUtils';
+import { toast } from 'sonner';
+
+const DEFAULT_FILTERS = {
+  searchTerm: '',
+  category: 'ALL',
+  size: 'ALL',
+  color: 'ALL',
+  minPrice: '',
+  maxPrice: '',
+  brand: 'ALL',
+  stockStatus: 'ALL',
+};
+
+export function ProductosPage() {
+  const navigate = useNavigate();
+  const { products, loading, createProduct, editProduct, removeProduct, clearProducts } = useProducts();
+  const { categories } = useCategories();
+  const { brands } = useBrands();
+
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [viewingProduct, setViewingProduct] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  const handleFilterChange = (updates) => {
+    setFilters((prev) => ({ ...prev, ...updates }));
+    setCurrentPage(1);
+  };
+
+  const handleResetFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setCurrentPage(1);
+  };
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      // 1. Search Query (name, sku, barcode, description, or variant codes)
+      if (filters.searchTerm?.trim()) {
+        const query = filters.searchTerm.trim().toLowerCase();
+        const matchName = p.name?.toLowerCase().includes(query);
+        const matchSku = p.sku?.toLowerCase().includes(query);
+        const matchBarcode = p.barcode?.includes(query);
+        const matchDesc = p.description?.toLowerCase().includes(query);
+        const matchVariant = p.variants?.some(
+          (v) =>
+            v.sku?.toLowerCase().includes(query) ||
+            v.barcode?.includes(query) ||
+            v.color?.toLowerCase().includes(query) ||
+            v.size?.toLowerCase().includes(query)
+        );
+        if (!matchName && !matchSku && !matchBarcode && !matchDesc && !matchVariant) {
+          return false;
+        }
+      }
+
+      // 2. Category Filter
+      if (filters.category && filters.category !== 'ALL') {
+        const matchCat =
+          p.categoryId === filters.category || p.categoryName === filters.category;
+        if (!matchCat) return false;
+      }
+
+      // 3. Size Filter (Talle)
+      if (filters.size && filters.size !== 'ALL') {
+        const targetSize = filters.size.trim().toLowerCase();
+        const hasSize = p.variants?.some(
+          (v) => v.size?.trim().toLowerCase() === targetSize
+        );
+        if (!hasSize) return false;
+      }
+
+      // 4. Color Filter
+      if (filters.color && filters.color !== 'ALL') {
+        const targetColor = filters.color.trim().toLowerCase();
+        const hasColor = p.variants?.some(
+          (v) =>
+            v.color?.trim().toLowerCase().includes(targetColor) ||
+            targetColor.includes(v.color?.trim().toLowerCase())
+        );
+        if (!hasColor) return false;
+      }
+
+      // 5. Brand Filter
+      if (filters.brand && filters.brand !== 'ALL') {
+        const matchBrand =
+          p.brandId === filters.brand || p.brandName === filters.brand;
+        if (!matchBrand) return false;
+      }
+
+      // 6. Price Range Filter (Rango de Precios)
+      const salePrice = Number(p.salePrice) || 0;
+      if (filters.minPrice !== '' && filters.minPrice !== undefined) {
+        const min = Number(filters.minPrice);
+        if (!isNaN(min) && salePrice < min) return false;
+      }
+      if (filters.maxPrice !== '' && filters.maxPrice !== undefined) {
+        const max = Number(filters.maxPrice);
+        if (!isNaN(max) && salePrice > max) return false;
+      }
+
+      // 7. Stock Status Filter
+      const stock = Number(p.stock) || 0;
+      const stockMin = Number(p.stockMin) || 5;
+      if (filters.stockStatus === 'IN_STOCK' && stock <= 0) return false;
+      if (filters.stockStatus === 'LOW_STOCK' && (stock > stockMin || stock <= 0)) return false;
+      if (filters.stockStatus === 'OUT_OF_STOCK' && stock !== 0) return false;
+
+      return true;
+    });
+  }, [products, filters]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedProducts = useMemo(() => {
+    return filteredProducts.slice(startIndex, startIndex + pageSize);
+  }, [filteredProducts, startIndex, pageSize]);
+
+  const handleOpenCreate = () => {
+    setEditingProduct(null);
+    setModalOpen(true);
+  };
+
+  const handleOpenEdit = (product) => {
+    setEditingProduct(product);
+    setModalOpen(true);
+  };
+
+  const handleSave = async (formData) => {
+    if (editingProduct) {
+      await editProduct(editingProduct.id, formData);
+    } else {
+      await createProduct(formData);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingId) return;
+    setIsDeleting(true);
+    try {
+      await removeProduct(deletingId);
+      setDeletingId(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    const data = filteredProducts.map((p) => ({
+      Nombre: p.name,
+      SKU: p.sku,
+      CódigoBarras: p.barcode,
+      Categoría: p.categoryName,
+      Marca: p.brandName,
+      PrecioCosto: p.costPrice,
+      PrecioVenta: p.salePrice,
+      StockTotal: p.stock,
+      StockMinimo: p.stockMin,
+      VariantesCount: p.variants?.length || 0,
+    }));
+    exportToExcel(data, 'Catalogo_Productos.xlsx', 'Productos');
+    toast.success('Catálogo exportado a Excel');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
+            Catálogo de Productos
+          </h1>
+          <p className="text-xs text-neutral-500 mt-0.5 font-medium">
+            Gestión completa de prendas, talles, colores y precios
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {products.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={Trash2}
+              onClick={() => setConfirmClearOpen(true)}
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-neutral-200"
+            >
+              Vaciar Prendas
+            </Button>
+          )}
+          <Button variant="outline" size="sm" leftIcon={Download} onClick={handleExportExcel}>
+            Exportar Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={TrendingUp}
+            onClick={() => navigate('/revision-precios')}
+            className="border-neutral-300 text-neutral-800 hover:bg-neutral-50"
+          >
+            Revisión de Precios
+          </Button>
+          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+            Nuevo Producto
+          </Button>
+        </div>
+      </div>
+
+      {/* Advanced Filters & Search Toolbar */}
+      <InventoryAdvancedFilters
+        products={products}
+        categories={categories}
+        brands={brands}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onResetFilters={handleResetFilters}
+        totalProductsCount={products.length}
+        filteredCount={filteredProducts.length}
+      />
+
+      {/* Table */}
+      <div className="card-panel bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-xs">
+        {loading ? (
+          <div className="p-6">
+            <TableSkeleton rows={6} cols={6} />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
+                <tr>
+                  <th className="p-4">Prenda / Foto</th>
+                  <th className="p-4">Categoría / Marca</th>
+                  <th className="p-4">Precio Venta</th>
+                  <th className="p-4">Variantes</th>
+                  <th className="p-4 text-center">Stock Total</th>
+                  <th className="p-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-200">
+                {paginatedProducts.map((p) => (
+                  <tr key={p.id} className="hover:bg-neutral-50/80 transition-colors">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=100&q=80'}
+                          alt={p.name}
+                          className="w-10 h-10 rounded-xl object-cover bg-neutral-100 border border-neutral-200"
+                        />
+                        <div>
+                          <p className="font-bold text-neutral-900">{p.name}</p>
+                          <p className="text-[10px] text-neutral-500 font-mono">SKU: {p.sku}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-semibold text-neutral-800">{p.categoryName}</p>
+                      <p className="text-[10px] text-neutral-500">{p.brandName}</p>
+                    </td>
+                    <td className="p-4 font-black text-neutral-900">
+                      {formatCurrency(p.salePrice)}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-1 flex-wrap max-w-xs">
+                        {p.variants?.slice(0, 4).map((v, i) => (
+                          <span
+                            key={i}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white border border-neutral-200 text-neutral-800"
+                          >
+                            {v.color.slice(0, 3)}/{v.size} ({v.stock})
+                          </span>
+                        ))}
+                        {(p.variants?.length || 0) > 4 && (
+                          <span className="text-[10px] text-neutral-500 font-bold">
+                            +{p.variants.length - 4} más
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 text-center">
+                      <Badge
+                        size="sm"
+                        variant={p.stock === 0 ? 'danger' : p.stock <= (p.stockMin || 5) ? 'warning' : 'success'}
+                      >
+                        {p.stock === 0 ? 'Agotado' : `${p.stock} u.`}
+                      </Badge>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setViewingProduct(p)}
+                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                          title="Ver detalle"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(p)}
+                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingId(p.id)}
+                          className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredProducts.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center text-neutral-500">
+                      {products.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-neutral-100 flex items-center justify-center text-neutral-400">
+                            <Shirt className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-neutral-900">No hay prendas registradas</p>
+                            <p className="text-xs text-neutral-500 mt-1">
+                              El sistema está nuevo y listo para usar. Comienza cargando tu primera prenda con sus talles, colores y precios.
+                            </p>
+                          </div>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            leftIcon={Plus}
+                            onClick={() => {
+                              setEditingProduct(null);
+                              setModalOpen(true);
+                            }}
+                          >
+                            Nueva Prenda
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
+                          <div className="w-12 h-12 rounded-2xl bg-neutral-100 flex items-center justify-center text-neutral-400">
+                            <Filter className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-neutral-900">No se encontraron prendas</p>
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Ningún producto coincide con los filtros seleccionados (categoría, talle, color o rango de precios).
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={RotateCcw}
+                            onClick={handleResetFilters}
+                          >
+                            Restablecer Filtros
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination Bar */}
+        {!loading && filteredProducts.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 bg-neutral-50/70 border-t border-neutral-200 text-xs">
+            <div className="flex items-center gap-3 text-neutral-600">
+              <span>
+                Mostrando <strong className="text-neutral-900">{startIndex + 1}</strong> -{' '}
+                <strong className="text-neutral-900">
+                  {Math.min(startIndex + pageSize, filteredProducts.length)}
+                </strong>{' '}
+                de <strong className="text-neutral-900">{filteredProducts.length}</strong> prendas
+              </span>
+              <span className="text-neutral-300">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-neutral-500">Por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-white border border-neutral-300 rounded-lg px-2 py-1 text-xs font-semibold text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-900 cursor-pointer"
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+              <span className="text-neutral-500 mr-1">
+                Pág. <strong className="text-neutral-900">{currentPage}</strong> de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                title="Página anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="p-1.5 rounded-lg border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                title="Página siguiente"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Product Form Modal */}
+      <ProductFormModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={handleSave}
+        initialProduct={editingProduct}
+        categories={categories}
+        brands={brands}
+      />
+
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        isOpen={!!viewingProduct}
+        onClose={() => setViewingProduct(null)}
+        product={viewingProduct}
+        onEdit={handleOpenEdit}
+      />
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={!!deletingId}
+        onClose={() => setDeletingId(null)}
+        onConfirm={handleConfirmDelete}
+        title="¿Eliminar producto?"
+        description="Se eliminará la prenda y todas sus variantes de talle/color del sistema."
+        isLoading={isDeleting}
+      />
+
+      {/* Confirm Clear All Products Dialog */}
+      <ConfirmDialog
+        isOpen={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        onConfirm={async () => {
+          setIsClearing(true);
+          try {
+            await clearProducts();
+            setConfirmClearOpen(false);
+          } finally {
+            setIsClearing(false);
+          }
+        }}
+        title="¿Vaciar todo el catálogo de prendas?"
+        description="Esta acción eliminará todas las prendas y variantes registradas en el sistema para dejar la base de datos completamente limpia. No se puede deshacer."
+        confirmText="Sí, vaciar catálogo"
+        variant="danger"
+        isLoading={isClearing}
+      />
+    </div>
+  );
+}

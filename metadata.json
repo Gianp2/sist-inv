@@ -1,0 +1,8 @@
+{
+  "name": "Sistema Inv",
+  "description": "Sistema integral para tienda de indumentaria: control de stock por talles y colores, gestión de caja por períodos, historial completo de precios y costos, auditoría de stock antiguo/estancado y sugerencias inteligentes de precios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,154 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for Authentication & Role-Based Access Control (RBAC)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActive() {
+      return isAuthenticated() && (
+        !hasUserDoc() || getUserDoc().active == true
+      );
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.uid == 'zvKPMDfIe0ZfwdikFBmhYCyq7w42' ||
+        request.auth.token.email == 'admin@sistema.com' ||
+        (hasUserDoc() && getUserDoc().role == 'ADMIN')
+      );
+    }
+
+    function isSupervisor() {
+      return isAuthenticated() && isActive() && (
+        isAdmin() || (hasUserDoc() && getUserDoc().role == 'SUPERVISOR')
+      );
+    }
+
+    function isEmpleado() {
+      return isAuthenticated() && isActive() && (
+        isAdmin() || isSupervisor() ||
+        (hasUserDoc() && (getUserDoc().role == 'EMPLEADO' || getUserDoc().role == 'CAJERO'))
+      );
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create: if isAdmin() || (
+        isAuthenticated() && request.auth.uid == userId && (
+          // When creating own profile, only admin email/UID can have ADMIN role
+          request.resource.data.role != 'ADMIN' ||
+          request.auth.uid == 'zvKPMDfIe0ZfwdikFBmhYCyq7w42' ||
+          request.auth.token.email == 'admin@sistema.com'
+        )
+      );
+      // Only ADMIN can change roles or activate/deactivate users
+      allow update: if isAdmin() || (
+        isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.active == resource.data.active
+      );
+      allow delete: if isAdmin() && userId != 'zvKPMDfIe0ZfwdikFBmhYCyq7w42';
+    }
+
+    // SETTINGS COLLECTION (General store & Cloudinary config - Admin only write)
+    match /settings/{settingId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAdmin();
+    }
+
+    // CATEGORIES
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isSupervisor();
+    }
+
+    // BRANDS
+    match /brands/{brandId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isSupervisor();
+    }
+
+    // PRODUCTS
+    match /products/{productId} {
+      allow read: if isAuthenticated() && isActive();
+      // Admin and supervisor can create, edit, or delete products
+      allow create, delete: if isSupervisor();
+      // Empleados can update product stock/variants during sales/caja operations
+      allow update: if isSupervisor() || isEmpleado();
+    }
+
+    // CUSTOMERS
+    match /customers/{customerId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create, update: if isEmpleado();
+      allow delete: if isSupervisor();
+    }
+
+    // SUPPLIERS
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // SALES
+    match /sales/{saleId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create: if isEmpleado();
+      allow update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // PURCHASES (Sensitive supplier cost data)
+    match /purchases/{purchaseId} {
+      allow read, create: if isSupervisor();
+      allow update, delete: if isAdmin();
+    }
+
+    // CASH REGISTERS (Shifts)
+    match /cashRegisters/{registerId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create, update: if isEmpleado();
+      allow delete: if isAdmin();
+    }
+
+    // CASH MOVEMENTS
+    match /cashMovements/{movementId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create: if isEmpleado();
+      allow update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // STOCK MOVEMENTS
+    match /stockMovements/{movId} {
+      allow read: if isAuthenticated() && isActive();
+      allow create: if isEmpleado();
+      allow update, delete: if isAdmin();
+    }
+
+    // COST & PRICE HISTORIES
+    match /costHistory/{id} {
+      allow read: if isAuthenticated() && isActive();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+    match /priceHistory/{id} {
+      allow read: if isAuthenticated() && isActive();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+  }
+}

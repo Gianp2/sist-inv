@@ -1,0 +1,20 @@
+// Firestore collection names as constants to prevent typo bugs
+export const COLLECTIONS = {
+  USERS: 'users',
+  PRODUCTS: 'products',
+  CATEGORIES: 'categories',
+  BRANDS: 'brands',
+  CUSTOMERS: 'customers',
+  SUPPLIERS: 'suppliers',
+  PURCHASES: 'purchases',
+  SALES: 'sales',
+  CASH_REGISTERS: 'cashRegisters',
+  CASH_MOVEMENTS: 'cashMovements',
+  STOCK_MOVEMENTS: 'stockMovements',
+  RETURNS: 'returns',
+  SETTINGS: 'settings',
+  NOTIFICATIONS: 'notifications',
+  LOGS: 'logs',
+  PRICE_HISTORY: 'priceHistory',
+  COST_HISTORY: 'costHistory',
+};
