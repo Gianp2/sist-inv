@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,14 +17,16 @@ import {
   ChevronRight,
   LogOut,
   ShieldCheck,
+  UserCheck,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../context/SettingsContext';
 import { cn } from '../../utils/cn';
+import { ROLES, ROLE_LABELS } from '../../constants/roles';
 
 export function Sidebar({ isCollapsed, toggleSidebar, mobileOpen, setMobileOpen }) {
-  const { user, logout } = useAuth();
+  const { user, role, roleLabel, isOwner, isEmployee, can, logout } = useAuth();
   const { settings } = useSettings();
   const storeName = settings?.businessName || 'Sistema Inv';
   const storeSubtitle = settings?.address || 'Control de Stock & Caja';
@@ -70,35 +72,43 @@ export function Sidebar({ isCollapsed, toggleSidebar, mobileOpen, setMobileOpen 
       title: 'Principal',
       items: [
         { name: 'Dashboard', path: '/', end: true, icon: LayoutDashboard },
-        { name: 'Caja y Finanzas', path: '/caja', icon: CircleDollarSign, badge: 'Mes / Sem' },
+        { name: 'Caja del Turno', path: '/caja', icon: CircleDollarSign, badge: 'Caja', permission: 'cash.view' },
       ],
     },
     {
       title: 'Inventario y Stock',
       items: [
-        { name: 'Productos y Prendas', path: '/productos', icon: Shirt },
-        { name: 'Revisión de Precios', path: '/revision-precios', icon: TrendingUp, badge: 'Sugerencias' },
-        { name: 'Control de Stock', path: '/stock', icon: Boxes },
-        { name: 'Categorías', path: '/categorias', icon: Tags },
-        { name: 'Marcas', path: '/marcas', icon: Bookmark },
+        { name: 'Productos y Prendas', path: '/productos', icon: Shirt, permission: 'products.view' },
+        { name: 'Revisión de Precios', path: '/revision-precios', icon: TrendingUp, badge: 'Sugerencias', permission: 'pricing.manage' },
+        { name: 'Control de Stock', path: '/stock', icon: Boxes, permission: 'stock.view' },
+        { name: 'Categorías', path: '/categorias', icon: Tags, permission: 'categories.view' },
+        { name: 'Marcas', path: '/marcas', icon: Bookmark, permission: 'brands.view' },
       ],
     },
     {
       title: 'Operaciones y Contactos',
       items: [
-        { name: 'Compras de Stock', path: '/compras', icon: ShoppingBag },
-        { name: 'Proveedores', path: '/proveedores', icon: Truck },
-        { name: 'Clientes', path: '/clientes', icon: Users },
+        { name: 'Compras de Stock', path: '/compras', icon: ShoppingBag, permission: 'purchases.view' },
+        { name: 'Proveedores', path: '/proveedores', icon: Truck, permission: 'suppliers.view' },
+        { name: 'Clientes', path: '/clientes', icon: Users, permission: 'customers.view' },
       ],
     },
     {
       title: 'Administración',
       items: [
-        { name: 'Reportes de Gestión', path: '/reportes', icon: BarChart3 },
-        { name: 'Configuración', path: '/configuracion', icon: Settings },
+        { name: 'Reportes de Gestión', path: '/reportes', icon: BarChart3, permission: 'reports.view' },
+        { name: 'Usuarios y Permisos', path: '/usuarios', icon: ShieldCheck, permission: 'users.manage' },
+        { name: 'Configuración', path: '/configuracion', icon: Settings, permission: 'settings.view' },
       ],
     },
   ];
+
+  const visibleSections = navigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.permission || can(item.permission)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <>
@@ -185,7 +195,7 @@ export function Sidebar({ isCollapsed, toggleSidebar, mobileOpen, setMobileOpen 
 
         {/* Navigation links scrollable area */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 scrollbar-thin scrollbar-thumb-neutral-200">
-          {navigationSections.map((section, idx) => (
+          {visibleSections.map((section, idx) => (
             <div key={idx} className="space-y-1">
               <p
                 className={cn(
@@ -235,25 +245,43 @@ export function Sidebar({ isCollapsed, toggleSidebar, mobileOpen, setMobileOpen 
           ))}
         </nav>
 
-        {/* User Footer Profile */}
-        <div className="p-3 border-t border-neutral-200 bg-white shrink-0">
+        {/* User Footer Profile & Account Switcher */}
+        <div className="p-3 border-t border-neutral-200 bg-white shrink-0 space-y-2">
           <div className={cn('flex items-center gap-3', isCollapsed && 'lg:justify-center')}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 bg-neutral-900 text-white shadow-2xs">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <div
+              className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs',
+                isOwner
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-blue-600 text-white'
+              )}
+            >
+              {isOwner ? (
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <UserCheck className="w-4 h-4 text-blue-100" />
+              )}
             </div>
             <div className={cn('truncate flex-1 min-w-0', isCollapsed && 'lg:hidden')}>
               <p className="text-xs font-bold text-neutral-900 truncate">
-                {user?.displayName || 'Administrador'}
+                {user?.displayName || (isOwner ? 'Dueña' : 'Empleada')}
               </p>
-              <p className="text-[10px] text-neutral-500 truncate flex items-center gap-1 font-semibold">
-                Administrador Único
-              </p>
+              <span
+                className={cn(
+                  'inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md mt-0.5',
+                  isOwner
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-blue-50 text-blue-800 border border-blue-200'
+                )}
+              >
+                {roleLabel}
+              </span>
             </div>
             <button
               onClick={logout}
               title="Cerrar Sesión"
               className={cn(
-                'p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-neutral-200/60 transition-colors cursor-pointer',
+                'p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer',
                 isCollapsed && 'lg:hidden'
               )}
               aria-label="Cerrar Sesión"

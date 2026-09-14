@@ -7,17 +7,19 @@ import {
   resetPassword as resetPasswordService,
   getExistingAdmin,
   getStoredSession,
+  quickSwitchRole,
 } from '../services/firebase/auth';
 import { COLLECTIONS } from '../constants/collections';
 import { getDocument, subscribeCollection } from '../services/firebase/firestore';
 import { ROLES, hasPermission, ROLE_LABELS } from '../constants/roles';
 import { seedDatabaseIfEmpty } from '../services/api/seedData';
+import { toastAlert } from '../components/ui/Toast';
 
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getStoredSession());
-  const [loading, setLoading] = useState(() => !getStoredSession());
+  const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -58,7 +60,7 @@ export function AuthProvider({ children }) {
         const foundAdmin = usersList.find((u) => u.role === ROLES.ADMIN && u.active !== false);
         setActiveAdminUser(foundAdmin || null);
 
-        // If current logged-in user had their role or active status updated in Firestore, sync state
+        // If current logged-in user had their role, active status, or permissions updated in Firestore, sync state
         if (user) {
           const currentInDb = usersList.find((u) => (u.uid || u.id) === (user.uid || user.id));
           if (currentInDb) {
@@ -67,8 +69,20 @@ export function AuthProvider({ children }) {
               setUser(null);
               return;
             }
-            if (currentInDb.role !== user.role || currentInDb.active !== user.active) {
-              setUser((prev) => (prev ? { ...prev, ...currentInDb } : currentInDb));
+            const permissionsChanged =
+              JSON.stringify(currentInDb.permissions || null) !==
+              JSON.stringify(user.permissions || null);
+
+            if (
+              currentInDb.role !== user.role ||
+              currentInDb.active !== user.active ||
+              permissionsChanged
+            ) {
+              setUser((prev) => {
+                const updated = prev ? { ...prev, ...currentInDb } : currentInDb;
+                setStoredSession(updated);
+                return updated;
+              });
             }
           }
         }
@@ -148,9 +162,13 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     setIsActionLoading(true);
     try {
+      sessionStorage.removeItem('sistema_startup_toast');
       await logoutUser();
       setUser(null);
       setError(null);
+      toastAlert.logoutSuccess();
+    } catch (err) {
+      toastAlert.error('Error al salir', err.message || 'No se pudo cerrar sesión');
     } finally {
       setIsActionLoading(false);
     }
@@ -162,19 +180,55 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       await resetPasswordService(email);
+      toastAlert.success('Correo enviado', 'Revisa tu casilla para restablecer la contraseña.');
     } catch (err) {
       setError(err.message || 'Error al enviar recuperación');
+      toastAlert.error('Error al recuperar', err.message || 'No se pudo enviar el correo.');
       throw err;
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  // Permission helper
+  // Quick switch between Owner and Employee
+  const switchAccount = async (targetRole) => {
+    setIsActionLoading(true);
+    setError(null);
+    try {
+      const switchedUser = await quickSwitchRole(targetRole);
+      setUser(switchedUser);
+      await syncAdminStatus();
+      const roleName = targetRole === ROLES.ADMIN || targetRole === 'ADMIN' ? 'Dueña / Administradora' : 'Vendedora';
+      toastAlert.accountSwitched(roleName);
+      return switchedUser;
+    } catch (err) {
+      setError(err.message || 'Error al alternar usuario');
+      toastAlert.error('Error al cambiar usuario', err.message);
+      throw err;
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Permission helpers
   const can = (permission) => {
-    if (!user) return false;
+    if (!user || user.active === false) return false;
     if (user.role === ROLES.ADMIN) return true;
-    return hasPermission(user.role || ROLES.EMPLEADO, permission);
+    return hasPermission(user.role || ROLES.EMPLEADO, permission, user.permissions);
+  };
+
+  const canAny = (permissions = []) => {
+    if (!user || user.active === false) return false;
+    if (user.role === ROLES.ADMIN) return true;
+    if (!Array.isArray(permissions)) return false;
+    return permissions.some((perm) => can(perm));
+  };
+
+  const canAll = (permissions = []) => {
+    if (!user || user.active === false) return false;
+    if (user.role === ROLES.ADMIN) return true;
+    if (!Array.isArray(permissions)) return false;
+    return permissions.every((perm) => can(perm));
   };
 
   const isRole = (...roles) => {
@@ -204,7 +258,10 @@ export function AuthProvider({ children }) {
     logout,
     resetPassword,
     refreshUser,
+    switchAccount,
     can,
+    canAny,
+    canAll,
     isRole,
     isAuthenticated: !!user && user.active !== false,
   };

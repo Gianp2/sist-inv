@@ -9,7 +9,9 @@ import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 import { registerUser } from '../../services/firebase/auth';
+import { UserPermissionsModal } from './UserPermissionsModal';
 import {
+  Shield,
   ShieldCheck,
   Crown,
   UserPlus,
@@ -21,14 +23,25 @@ import {
   Info,
   Check,
   X,
+  Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function UsuariosPage() {
-  const { users, loading, adminUser, changeUserRole, toggleUserStatus, removeUser } = useUsers();
+  const {
+    users,
+    loading,
+    adminUser,
+    changeUserRole,
+    toggleUserStatus,
+    updateUserPermissions,
+    removeUser,
+  } = useUsers();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [permissionUser, setPermissionUser] = useState(null);
   const [newRole, setNewRole] = useState(ROLES.EMPLEADO);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,6 +92,11 @@ export function UsuariosPage() {
     setSelectedUser(user);
     setNewRole(user.role || ROLES.EMPLEADO);
     setIsRoleModalOpen(true);
+  };
+
+  const handleOpenPermissionsModal = (user) => {
+    setPermissionUser(user);
+    setIsPermissionsModalOpen(true);
   };
 
   const handleSaveRole = async () => {
@@ -232,6 +250,7 @@ export function UsuariosPage() {
                   <th className="p-3">Nombre</th>
                   <th className="p-3">Email</th>
                   <th className="p-3">Rol del Sistema</th>
+                  <th className="p-3 text-center">Permisos</th>
                   <th className="p-3 text-center">Estado</th>
                   <th className="p-3 text-right">Acciones</th>
                 </tr>
@@ -239,6 +258,7 @@ export function UsuariosPage() {
               <tbody className="divide-y divide-neutral-100">
                 {users.map((u) => {
                   const isMasterAdmin = u.role === ROLES.ADMIN;
+                  const hasCustom = u.permissions && typeof u.permissions === 'object' && Object.keys(u.permissions).length > 0;
                   return (
                     <tr
                       key={u.id || u.uid}
@@ -289,12 +309,48 @@ export function UsuariosPage() {
                         </Badge>
                       </td>
                       <td className="p-3 text-center">
+                        {isMasterAdmin ? (
+                          <Badge size="xs" variant="danger" className="gap-1">
+                            <Crown className="w-3 h-3" /> Total
+                          </Badge>
+                        ) : hasCustom ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPermissionsModal(u)}
+                            className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                            title="Ver permisos personalizados"
+                          >
+                            <Badge size="xs" variant="warning" className="gap-1">
+                              <Shield className="w-3 h-3 text-amber-700" /> Personalizados
+                            </Badge>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPermissionsModal(u)}
+                            className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                            title="Ver permisos por defecto"
+                          >
+                            <Badge size="xs" variant="neutral" className="gap-1">
+                              <ShieldCheck className="w-3 h-3 text-neutral-500" /> Por Rol
+                            </Badge>
+                          </button>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
                         <Badge size="xs" variant={u.active !== false ? 'success' : 'neutral'}>
                           {u.active !== false ? 'Activo' : 'Inactivo'}
                         </Badge>
                       </td>
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleOpenPermissionsModal(u)}
+                            className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
+                            title="Configurar Permisos Individuales"
+                          >
+                            <Key className="w-4 h-4 text-neutral-700" />
+                          </button>
                           <button
                             onClick={() => handleOpenRoleModal(u)}
                             className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
@@ -458,6 +514,17 @@ export function UsuariosPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Permissions Modal */}
+      <UserPermissionsModal
+        isOpen={isPermissionsModalOpen}
+        onClose={() => {
+          setIsPermissionsModalOpen(false);
+          setPermissionUser(null);
+        }}
+        user={permissionUser}
+        onSavePermissions={updateUserPermissions}
+      />
     </div>
   );
 }

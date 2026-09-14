@@ -25,7 +25,12 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.uid == 'zvKPMDfIe0ZfwdikFBmhYCyq7w42' ||
         request.auth.token.email == 'admin@sistema.com' ||
-        (hasUserDoc() && getUserDoc().role == 'ADMIN')
+        (hasUserDoc() && (
+          getUserDoc().role == 'ADMIN' ||
+          getUserDoc().role == 'DUEÑA' ||
+          getUserDoc().role == 'DUENA' ||
+          getUserDoc().role == 'SUPERADMIN'
+        ))
       );
     }
 
@@ -42,6 +47,20 @@ service cloud.firestore {
       );
     }
 
+    // Granular permission check:
+    // 1. Admin always has full access
+    // 2. If user doc has custom permissions and the permission key exists, check that boolean
+    // 3. Fallback to role default condition
+    function hasPermission(permKey, roleDefault) {
+      return isAdmin() || (
+        isAuthenticated() && isActive() && (
+          (hasUserDoc() && ('permissions' in getUserDoc()) && getUserDoc().permissions != null && (permKey in getUserDoc().permissions))
+            ? getUserDoc().permissions[permKey] == true
+            : roleDefault
+        )
+      );
+    }
+
     // USERS COLLECTION
     match /users/{userId} {
       allow read: if isAuthenticated() && isActive();
@@ -53,11 +72,12 @@ service cloud.firestore {
           request.auth.token.email == 'admin@sistema.com'
         )
       );
-      // Only ADMIN can change roles or activate/deactivate users
+      // Only ADMIN can change roles, permissions, or activate/deactivate users
       allow update: if isAdmin() || (
         isAuthenticated() && request.auth.uid == userId &&
         request.resource.data.role == resource.data.role &&
-        request.resource.data.active == resource.data.active
+        request.resource.data.active == resource.data.active &&
+        (!('permissions' in request.resource.data) || request.resource.data.permissions == resource.data.permissions)
       );
       allow delete: if isAdmin() && userId != 'zvKPMDfIe0ZfwdikFBmhYCyq7w42';
     }
@@ -65,89 +85,80 @@ service cloud.firestore {
     // SETTINGS COLLECTION (General store & Cloudinary config - Admin only write)
     match /settings/{settingId} {
       allow read: if isAuthenticated() && isActive();
-      allow write: if isAdmin();
+      allow write: if hasPermission('settings.edit', isAdmin());
     }
 
     // CATEGORIES
     match /categories/{categoryId} {
-      allow read: if isAuthenticated() && isActive();
-      allow write: if isSupervisor();
+      allow read, create, update: if isAuthenticated() && isActive();
+      allow delete: if hasPermission('categories.delete', isSupervisor());
     }
 
     // BRANDS
     match /brands/{brandId} {
-      allow read: if isAuthenticated() && isActive();
-      allow write: if isSupervisor();
+      allow read, create, update: if isAuthenticated() && isActive();
+      allow delete: if hasPermission('brands.delete', isSupervisor());
     }
 
     // PRODUCTS
     match /products/{productId} {
-      allow read: if isAuthenticated() && isActive();
-      // Admin and supervisor can create, edit, or delete products
-      allow create, delete: if isSupervisor();
-      // Empleados can update product stock/variants during sales/caja operations
-      allow update: if isSupervisor() || isEmpleado();
+      allow read, create, update: if isAuthenticated() && isActive();
+      allow delete: if hasPermission('products.delete', isSupervisor());
     }
 
     // CUSTOMERS
     match /customers/{customerId} {
-      allow read: if isAuthenticated() && isActive();
-      allow create, update: if isEmpleado();
-      allow delete: if isSupervisor();
+      allow read, create, update: if isAuthenticated() && isActive();
+      allow delete: if hasPermission('customers.delete', isSupervisor());
     }
 
     // SUPPLIERS
     match /suppliers/{supplierId} {
-      allow read: if isAuthenticated() && isActive();
-      allow create, update: if isSupervisor();
+      allow read: if hasPermission('suppliers.view', isSupervisor());
+      allow create, update: if isAuthenticated() && isActive();
       allow delete: if isAdmin();
     }
 
     // SALES
     match /sales/{saleId} {
-      allow read: if isAuthenticated() && isActive();
-      allow create: if isEmpleado();
-      allow update: if isSupervisor();
+      allow read, create: if isAuthenticated() && isActive();
+      allow update: if hasPermission('sales.edit', isSupervisor());
       allow delete: if isAdmin();
     }
 
     // PURCHASES (Sensitive supplier cost data)
     match /purchases/{purchaseId} {
-      allow read, create: if isSupervisor();
-      allow update, delete: if isAdmin();
+      allow read: if hasPermission('purchases.view', isSupervisor());
+      allow create, update: if isAuthenticated() && isActive();
+      allow delete: if isAdmin();
     }
 
     // CASH REGISTERS (Shifts)
     match /cashRegisters/{registerId} {
-      allow read: if isAuthenticated() && isActive();
-      allow create, update: if isEmpleado();
+      allow read, create, update: if isAuthenticated() && isActive();
       allow delete: if isAdmin();
     }
 
     // CASH MOVEMENTS
     match /cashMovements/{movementId} {
-      allow read: if isAuthenticated() && isActive();
-      allow create: if isEmpleado();
-      allow update: if isSupervisor();
+      allow read, create: if isAuthenticated() && isActive();
+      allow update: if hasPermission('cash.edit', isSupervisor());
       allow delete: if isAdmin();
     }
 
     // STOCK MOVEMENTS
     match /stockMovements/{movId} {
-      allow read: if isAuthenticated() && isActive();
-      allow create: if isEmpleado();
-      allow update, delete: if isAdmin();
+      allow read, create: if isAuthenticated() && isActive();
+      allow update, delete: if hasPermission('stock.delete', isAdmin());
     }
 
     // COST & PRICE HISTORIES
     match /costHistory/{id} {
-      allow read: if isAuthenticated() && isActive();
-      allow create, update: if isSupervisor();
+      allow read, create, update: if isAuthenticated() && isActive();
       allow delete: if isAdmin();
     }
     match /priceHistory/{id} {
-      allow read: if isAuthenticated() && isActive();
-      allow create, update: if isSupervisor();
+      allow read, create, update: if isAuthenticated() && isActive();
       allow delete: if isAdmin();
     }
   }

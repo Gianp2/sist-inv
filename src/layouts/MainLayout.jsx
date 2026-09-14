@@ -1,12 +1,41 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Navbar } from '../components/layout/Navbar';
+import { useAuth } from '../context/AuthContext';
+import { useCashRegister } from '../context/CashContext';
+import { toastAlert } from '../components/ui/Toast';
 import { cn } from '../utils/cn';
 
 export function MainLayout() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, isOwner } = useAuth();
+  const { isCashOpen } = useCashRegister();
+  const navigate = useNavigate();
+
+  // Startup toast notification on session entry
+  useEffect(() => {
+    const hasNotifiedStartup = sessionStorage.getItem('sistema_startup_toast');
+    if (!hasNotifiedStartup && user) {
+      sessionStorage.setItem('sistema_startup_toast', 'true');
+      const roleName = isOwner ? 'Dueña' : 'Vendedora';
+      const userName = user.displayName || roleName;
+
+      const timer = setTimeout(() => {
+        if (!isCashOpen) {
+          toastAlert.cashWarning(
+            'La caja de hoy está cerrada. Puedes abrir el turno para registrar ventas y cobros.',
+            () => navigate('/caja')
+          );
+        } else {
+          toastAlert.sessionStartup(userName, roleName);
+        }
+      }, 600);
+
+      return () => clearTimeout(timer);
+    }
+  }, [user, isOwner, isCashOpen, navigate]);
 
   // Lock body scroll when mobile hamburger menu is open
   useEffect(() => {

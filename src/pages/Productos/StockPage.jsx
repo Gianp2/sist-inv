@@ -1,16 +1,21 @@
 import { useState, useMemo } from 'react';
 import { useProducts } from '../../hooks/useProducts';
 import { useSettings } from '../../hooks/useSettingsAndUsers';
+import { useAuth } from '../../hooks/useAuth';
 import { Boxes, AlertTriangle, Search, Check, Save, Shirt, Filter, ChevronLeft, ChevronRight, FileText, Download } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Alert } from '../../components/ui/Alert';
-import { toast } from 'sonner';
+import { ProductVisualBadge, GarmentSpecsPills } from '../../components/common/ProductVisualBadge';
+import { toastAlert, toast } from '../../components/ui/Toast';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 import { formatCurrency } from '../../utils/formatters';
 import { generateMonthlyReportPDF } from '../../utils/exportUtils';
+import { cn } from '../../utils/cn';
+import { sanitizeNumericValue, handleNumericFocus } from '../../utils/numericUtils';
 
 export function StockPage() {
+  const { can } = useAuth();
   const { products, loading, adjustVariantStock } = useProducts();
   const { settings } = useSettings();
   const [filterType, setFilterType] = useState('ALL'); // ALL, LOW, OUT
@@ -40,21 +45,27 @@ export function StockPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedProducts = useMemo(() => {
-    return filtered.slice(startIndex, startIndex + pageSize);
+    return (filtered || []).slice(startIndex, startIndex + pageSize);
   }, [filtered, startIndex, pageSize]);
 
   const handleStockInputChange = (variantKey, val) => {
-    setEditingStocks((prev) => ({ ...prev, [variantKey]: val }));
+    const sanitized = sanitizeNumericValue(val);
+    setEditingStocks((prev) => ({ ...prev, [variantKey]: sanitized }));
   };
 
   const handleSaveVariantStock = async (productId, variantId, currentVal) => {
     const key = `${productId}_${variantId}`;
-    const newStock = editingStocks[key] !== undefined ? editingStocks[key] : currentVal;
+    const rawStock = editingStocks[key] !== undefined ? editingStocks[key] : currentVal;
+    const newStock = Math.max(0, Number(rawStock) || 0);
+    const prod = products.find((p) => p.id === productId);
     await adjustVariantStock(productId, variantId, newStock, 'Ajuste manual desde control de stock');
     const updated = { ...editingStocks };
     delete updated[key];
     setEditingStocks(updated);
-    toast.success(`Stock actualizado: ${newStock} unidades`);
+    toastAlert.success(
+      'Stock actualizado',
+      `${prod?.name || 'Prenda'}: nuevo balance de ${newStock} unidades registrado.`
+    );
   };
 
   const handleExportStockPDF = () => {
@@ -67,17 +78,20 @@ export function StockPage() {
         businessInfo: settings,
         reportType: 'STOCK_ONLY',
       });
-      toast.success('Reporte de stock crítico generado en PDF');
+      toastAlert.success(
+        'PDF de Stock generado',
+        'El reporte de prendas y variantes se descargó correctamente.'
+      );
     } catch (err) {
       console.error(err);
-      toast.error('Error al generar reporte en PDF');
+      toastAlert.error('Error al generar PDF', 'No se pudo crear el reporte de stock.');
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Control de Stock y Talles
@@ -87,15 +101,15 @@ export function StockPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
           {/* Quick Filter Tabs */}
-          <div className="card-panel flex items-center gap-1.5 p-1 rounded-xl bg-white border border-neutral-200 shadow-2xs">
+          <div className="card-panel flex items-center justify-center gap-1.5 p-1 rounded-xl bg-white border border-neutral-200 shadow-2xs w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => {
                 setFilterType('ALL');
                 setCurrentPage(1);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                 filterType === 'ALL'
                   ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:text-neutral-900'
@@ -108,7 +122,7 @@ export function StockPage() {
                 setFilterType('LOW');
                 setCurrentPage(1);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                 filterType === 'LOW'
                   ? 'bg-amber-600 text-white shadow-xs'
                   : 'text-neutral-600 hover:text-amber-700'
@@ -121,7 +135,7 @@ export function StockPage() {
                 setFilterType('OUT');
                 setCurrentPage(1);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                 filterType === 'OUT'
                   ? 'bg-rose-600 text-white shadow-xs'
                   : 'text-neutral-600 hover:text-rose-700'
@@ -136,7 +150,7 @@ export function StockPage() {
             variant="outline"
             leftIcon={FileText}
             onClick={handleExportStockPDF}
-            className="cursor-pointer font-bold text-xs"
+            className="cursor-pointer font-bold text-xs w-full sm:w-auto justify-center"
           >
             PDF Stock Crítico
           </Button>
@@ -206,18 +220,41 @@ export function StockPage() {
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-3">
                 <div className="flex items-center gap-3">
-                  <img
-                    src={product.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=100&q=80'}
-                    alt={product.name}
-                    className="w-11 h-11 rounded-xl object-cover bg-neutral-100 border border-neutral-200"
-                  />
+                  <ProductVisualBadge product={product} size="md" />
                   <div>
-                    <h3 className="text-sm font-bold text-neutral-900">
-                      {product.name}
-                    </h3>
-                    <p className="text-[11px] text-neutral-500 font-medium">
-                      SKU: {product.sku} • {product.categoryName} • Mínimo alerta: {product.stockMin || 5} u.
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-neutral-900">
+                        {product.name}
+                      </h3>
+                      {!product.images?.[0] && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 border border-neutral-200">
+                          Sin foto
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-neutral-500 font-medium flex-wrap mt-0.5">
+                      <span className="font-mono">SKU: {product.sku}</span>
+                      <span>•</span>
+                      <span>{product.categoryName}</span>
+                      {product.location && (
+                        <>
+                          <span>•</span>
+                          <span className="text-neutral-800 font-semibold bg-neutral-100 px-1.5 py-0.5 rounded text-[10px]">
+                            📍 {product.location}
+                          </span>
+                        </>
+                      )}
+                      {product.fabric && (
+                        <>
+                          <span>•</span>
+                          <span className="text-neutral-700 text-[10px]">
+                            🧵 {product.fabric}
+                          </span>
+                        </>
+                      )}
+                      <span>•</span>
+                      <span>Mínimo alerta: {product.stockMin || 5} u.</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -233,14 +270,14 @@ export function StockPage() {
 
               {/* Variants inline editor */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {product.variants?.map((v) => {
-                  const key = `${product.id}_${v.id}`;
+                {product.variants?.filter((v) => v && typeof v === 'object').map((v, idx) => {
+                  const key = `${product.id}_${v.id || idx}`;
                   const currentVal = editingStocks[key] !== undefined ? editingStocks[key] : v.stock;
                   const hasChanged = editingStocks[key] !== undefined && Number(editingStocks[key]) !== v.stock;
 
                   return (
                     <div
-                      key={v.id}
+                      key={v.id || idx}
                       className="flex items-center justify-between p-3 rounded-xl bg-white border border-neutral-200 shadow-2xs"
                     >
                       <div className="flex items-center gap-2">
@@ -250,7 +287,7 @@ export function StockPage() {
                         />
                         <div>
                           <p className="text-xs font-bold text-neutral-900">
-                            {v.color} - <span className="font-extrabold">{v.size}</span>
+                            {v.color || 'Único'} - <span className="font-extrabold">{v.size || '-'}</span>
                           </p>
                           <p className="text-[10px] text-neutral-500 font-mono">{v.sku || '-'}</p>
                         </div>
@@ -260,11 +297,16 @@ export function StockPage() {
                         <input
                           type="number"
                           min="0"
+                          disabled={!can('stock.edit')}
                           value={currentVal}
-                          onChange={(e) => handleStockInputChange(key, Number(e.target.value))}
-                          className="w-16 h-8 text-center text-xs font-bold rounded-lg border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 hover:border-neutral-400"
+                          onFocus={handleNumericFocus}
+                          onChange={(e) => handleStockInputChange(key, e.target.value)}
+                          className={cn(
+                            "w-16 h-8 text-center text-xs font-bold rounded-lg border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 hover:border-neutral-400",
+                            !can('stock.edit') && "bg-neutral-100 text-neutral-500 cursor-not-allowed border-neutral-200"
+                          )}
                         />
-                        {hasChanged && (
+                        {can('stock.edit') && hasChanged && (
                           <button
                             onClick={() => handleSaveVariantStock(product.id, v.id, v.stock)}
                             className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer"

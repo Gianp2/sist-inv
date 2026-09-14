@@ -15,7 +15,7 @@ export function RecentActivity({ movements = [], lowStockProducts = [] }) {
           subtitle="Ingresos y salidas recientes"
         />
         <div className="space-y-3 mt-3">
-          {movements.slice(0, 5).map((m) => {
+          {(movements || []).slice(0, 5).map((m) => {
             const isPositive = m.type === 'INGRESO' || m.type === 'VENTA' || m.type === 'APERTURA_CAJA';
             return (
               <div
@@ -72,7 +72,7 @@ export function RecentActivity({ movements = [], lowStockProducts = [] }) {
           subtitle="Prendas con inventario bajo o sin existencias"
         />
         <div className="space-y-3 mt-3">
-          {lowStockProducts.slice(0, 5).map((prod) => (
+          {(lowStockProducts || []).slice(0, 5).map((prod) => (
             <div
               key={prod.id}
               onClick={() => navigate('/stock')}

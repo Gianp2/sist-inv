@@ -36,7 +36,7 @@ export function GlobalSearch({ isOpen, onClose }) {
   }, [isOpen, onClose]);
 
   const filteredProducts = queryText.trim()
-    ? products.filter((p) =>
+    ? (products || []).filter((p) =>
         p.name?.toLowerCase().includes(queryText.toLowerCase()) ||
         p.sku?.toLowerCase().includes(queryText.toLowerCase()) ||
         p.barcode?.includes(queryText)
@@ -44,7 +44,7 @@ export function GlobalSearch({ isOpen, onClose }) {
     : [];
 
   const filteredCustomers = queryText.trim()
-    ? customers.filter((c) =>
+    ? (customers || []).filter((c) =>
         c.name?.toLowerCase().includes(queryText.toLowerCase()) ||
         c.dni?.includes(queryText) ||
         c.phone?.includes(queryText)

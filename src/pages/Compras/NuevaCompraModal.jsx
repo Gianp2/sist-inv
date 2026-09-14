@@ -150,14 +150,14 @@ export function NuevaCompraModal({ isOpen, onClose, onSave, suppliers = [], prod
               type="number"
               min="1"
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
             />
             <Input
               label="Costo Unitario ($)"
               type="number"
               min="0"
               value={costPrice}
-              onChange={(e) => setCostPrice(Number(e.target.value))}
+              onChange={(e) => setCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
             />
             <Button
               type="button"

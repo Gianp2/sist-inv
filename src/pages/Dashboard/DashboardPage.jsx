@@ -1,17 +1,21 @@
 import { useProducts } from '../../hooks/useProducts';
 import { useCashRegister } from '../../context/CashContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import { StatCards } from './StatCards';
 import { SalesCharts } from './SalesCharts';
 import { RecentActivity } from './RecentActivity';
 import { QuickActions } from './QuickActions';
 import { Skeleton, CardSkeleton } from '../../components/ui/Skeleton';
+import { ShieldCheck, Info } from 'lucide-react';
 
 export function DashboardPage() {
   const { products, loading: productsLoading } = useProducts();
   const { allMovements, loading: cashLoading } = useCashRegister();
   const { settings } = useSettings();
+  const { can, roleLabel, user } = useAuth();
   const storeName = settings?.businessName || 'Sistema Inv';
+  const canSeeFinancials = can('dashboard.financials');
 
   if (productsLoading || cashLoading) {
     return (
@@ -56,7 +60,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Panel de Control
@@ -68,6 +72,19 @@ export function DashboardPage() {
         <QuickActions />
       </div>
 
+      {/* Role Notice for Employees */}
+      {!canSeeFinancials && (
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-blue-900 text-xs text-center sm:text-left">
+          <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold">Sesión activa como {roleLabel}:</span>{' '}
+            <span className="text-blue-800">
+              Tienes acceso a la caja del turno, cobro de ventas, registro de clientes y catálogo de stock. Los balances financieros mensuales, costos de compra y configuración del negocio están bloqueados y reservados exclusivamente a la Dueña.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <StatCards
         todayIncome={todayIncome}
@@ -76,10 +93,12 @@ export function DashboardPage() {
         totalStockUnits={totalStockUnits}
         lowStockCount={lowStockProducts.length}
         outOfStockCount={outOfStockProducts.length}
+        todaySalesCount={todayMovements.filter((m) => m.type === 'VENTA').length}
+        productsCount={products.length}
       />
 
-      {/* Cash Flow Charts */}
-      <SalesCharts movements={allMovements} />
+      {/* Cash Flow Charts (Solo Dueña / Admin) */}
+      {canSeeFinancials && <SalesCharts movements={allMovements} />}
 
       {/* Recent Activity & Stock alerts */}
       <RecentActivity movements={allMovements} lowStockProducts={[...outOfStockProducts, ...lowStockProducts]} />

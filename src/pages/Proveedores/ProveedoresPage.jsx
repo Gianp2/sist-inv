@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Truck, Search, Phone, Mail } from 'lucide-react';
 import { useSuppliers } from '../../hooks/useContacts';
+import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
@@ -8,6 +9,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 
 export function ProveedoresPage() {
+  const { can } = useAuth();
   const { suppliers, loading, createSupplier, editSupplier, removeSupplier } = useSuppliers();
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -75,9 +77,11 @@ export function ProveedoresPage() {
             Talleres, fabricantes y distribuidores mayoristas
           </p>
         </div>
-        <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
-          Nuevo Proveedor
-        </Button>
+        {can('suppliers.create') && (
+          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+            Nuevo Proveedor
+          </Button>
+        )}
       </div>
 
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 p-4 shadow-xs">
@@ -103,7 +107,9 @@ export function ProveedoresPage() {
                   <th className="p-3">Contacto</th>
                   <th className="p-3">CUIT / RUT</th>
                   <th className="p-3">Teléfono / Email</th>
-                  <th className="p-3 text-right">Acciones</th>
+                  {(can('suppliers.edit') || can('suppliers.delete')) && (
+                    <th className="p-3 text-right">Acciones</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
@@ -121,24 +127,30 @@ export function ProveedoresPage() {
                       <p className="text-neutral-900 font-medium">{s.phone || '-'}</p>
                       <p className="text-[10px] text-neutral-500 font-medium">{s.email || ''}</p>
                     </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleOpenEdit(s)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(s.id)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {(can('suppliers.edit') || can('suppliers.delete')) && (
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {can('suppliers.edit') && (
+                            <button
+                              onClick={() => handleOpenEdit(s)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {can('suppliers.delete') && (
+                            <button
+                              onClick={() => setDeletingId(s.id)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {filtered.length === 0 && (

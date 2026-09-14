@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCashRegister } from '../../context/CashContext';
 import { useAuth } from '../../hooks/useAuth';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -62,7 +62,7 @@ import { RegistrarIngresoModal } from './RegistrarIngresoModal';
 import { addDocument, updateDocument, getDocument } from '../../services/firebase/firestore';
 import { COLLECTIONS } from '../../constants/collections';
 import { calculateTotalStock } from '../../utils/calculations';
-import { toast } from 'sonner';
+import { toastAlert, toast } from '../../components/ui/Toast';
 
 export function CajaPage() {
   const {
@@ -77,13 +77,21 @@ export function CajaPage() {
     updateMovement,
     deleteMovement,
   } = useCashRegister();
-  const { user } = useAuth();
+  const { user, can, isOwner, roleLabel } = useAuth();
+  const canManageFinancials = can('dashboard.financials');
   const { products } = useProducts();
   const { customers } = useCustomers();
   const { settings } = useSettings();
 
   // Active Main Tab: 'TODOS' | 'TURNO' | 'MES' | 'SEMANA' | 'HISTORIAL'
-  const [activeTab, setActiveTab] = useState('TODOS');
+  const [activeTab, setActiveTab] = useState(() => (can('dashboard.financials') ? 'TODOS' : 'TURNO'));
+
+  // Ensure non-privileged users stay on accessible tabs
+  useEffect(() => {
+    if (!canManageFinancials && ['MES', 'SEMANA', 'HISTORIAL'].includes(activeTab)) {
+      setActiveTab('TURNO');
+    }
+  }, [canManageFinancials, activeTab]);
 
   // Modals
   const [openModalOpen, setOpenModalOpen] = useState(false);
@@ -140,11 +148,12 @@ export function CajaPage() {
   const handleOpenCash = async (e) => {
     e.preventDefault();
     try {
-      await openCash(Number(initialAmount) || 0, user?.displayName || 'Administrador');
-      toast.success('¡Caja abierta con éxito!');
+      const openAmount = Number(initialAmount) || 0;
+      await openCash(openAmount, user?.displayName || 'Administrador');
+      toastAlert.cashOpenSuccess(formatCurrency(openAmount));
       setOpenModalOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Error al abrir caja');
+      toastAlert.error('Error al abrir caja', err.message || 'No se pudo iniciar el turno de caja.');
     }
   };
 
@@ -152,10 +161,10 @@ export function CajaPage() {
     e.preventDefault();
     try {
       await closeCash(Number(actualClosingCash) || 0, closingNotes, user?.displayName || 'Administrador');
-      toast.success('¡Cierre de caja completado!');
+      toastAlert.cashCloseSuccess();
       setCloseModalOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Error al cerrar caja');
+      toastAlert.error('Error al cerrar caja', err.message || 'No se pudo registrar el cierre.');
     }
   };
 
@@ -170,9 +179,9 @@ export function CajaPage() {
         user: user?.displayName || 'Administrador',
         date: date || new Date().toISOString(),
       });
-      toast.success('Ingreso registrado correctamente');
+      toastAlert.success('Ingreso registrado', `${formatCurrency(amount)} acreditado en la caja.`);
     } catch (err) {
-      toast.error(err.message || 'Error al registrar ingreso');
+      toastAlert.error('Error al registrar ingreso', err.message || 'Intente nuevamente');
       throw err;
     }
   };
@@ -272,9 +281,9 @@ export function CajaPage() {
         date: date || new Date().toISOString(),
       });
 
-      toast.success(`Venta ${saleNumber} registrada: stock y caja actualizados`);
+      toastAlert.saleSuccess(saleNumber, formatCurrency(total));
     } catch (err) {
-      toast.error(err.message || 'Error al procesar la venta');
+      toastAlert.error('Error al procesar venta', err.message || 'No se pudo guardar la venta');
       throw err;
     }
   };
@@ -282,7 +291,7 @@ export function CajaPage() {
   const handleSaveExpense = async (e) => {
     e.preventDefault();
     if (!movAmount || Number(movAmount) <= 0) {
-      toast.error('Ingresa un monto válido mayor a 0');
+      toastAlert.error('Monto no válido', 'Ingresa un valor numérico mayor a $ 0');
       return;
     }
     try {
@@ -295,13 +304,13 @@ export function CajaPage() {
         user: user?.displayName || 'Administrador',
         date: movDate ? new Date(movDate + 'T12:00:00').toISOString() : new Date().toISOString(),
       });
-      toast.success('Egreso / Gasto registrado correctamente');
+      toastAlert.success('Egreso asentado', `${formatCurrency(movAmount)} deducido de la caja de hoy.`);
       setExpenseModalOpen(false);
       setMovAmount('');
       setMovDesc('');
       setMovCategory('');
     } catch (err) {
-      toast.error(err.message || 'Error al registrar egreso');
+      toastAlert.error('Error al registrar egreso', err.message || 'No se pudo asentar el gasto');
     }
   };
 
@@ -337,7 +346,7 @@ export function CajaPage() {
     if (!editingMovement) return;
     const numAmount = Number(editAmount);
     if (!numAmount || numAmount <= 0) {
-      toast.error('Ingresa un monto válido mayor a 0');
+      toastAlert.error('Monto requerido', 'Ingresa un importe válido mayor a 0');
       return;
     }
 
@@ -354,11 +363,11 @@ export function CajaPage() {
         paymentMethod: editPaymentMethod,
         date: editDate ? new Date(editDate + 'T12:00:00').toISOString() : new Date().toISOString(),
       });
-      toast.success('Movimiento actualizado correctamente');
+      toastAlert.success('Movimiento actualizado', 'Los cambios se reflejaron en la caja del turno.');
       setEditModalOpen(false);
       setEditingMovement(null);
     } catch (err) {
-      toast.error(err.message || 'Error al actualizar movimiento');
+      toastAlert.error('Error al actualizar', err.message || 'No se pudo guardar la modificación');
     } finally {
       setIsSavingEdit(false);
     }
@@ -374,11 +383,11 @@ export function CajaPage() {
     setIsDeleting(true);
     try {
       await deleteMovement(deletingMovement.id);
-      toast.success('Movimiento eliminado correctamente');
+      toastAlert.info('Movimiento eliminado', 'El registro fue retirado del balance de caja.');
       setDeleteModalOpen(false);
       setDeletingMovement(null);
     } catch (err) {
-      toast.error(err.message || 'Error al eliminar movimiento');
+      toastAlert.error('Error al eliminar', err.message || 'No se pudo eliminar el movimiento');
     } finally {
       setIsDeleting(false);
     }
@@ -624,7 +633,7 @@ export function CajaPage() {
       Monto: m.amount,
     }));
     exportToExcel(exportRows, `Movimientos_Caja_${activeTab}_${new Date().toISOString().split('T')[0]}`);
-    toast.success('Archivo exportado con éxito');
+    toastAlert.success('Excel exportado con éxito', 'La planilla de caja se descargó en tu dispositivo.');
   };
 
   const handleExportPDF = () => {
@@ -639,17 +648,17 @@ export function CajaPage() {
         userName: user?.name || user?.displayName || 'Administrador',
         reportType: 'CASH_ONLY',
       });
-      toast.success('Reporte mensual de caja generado en PDF');
+      toastAlert.success('PDF generado con éxito', 'El informe mensual de caja está listo.');
     } catch (err) {
       console.error(err);
-      toast.error('Error al generar PDF de caja');
+      toastAlert.error('Error al generar PDF', 'No se pudo crear el documento.');
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Control de Caja y Finanzas
@@ -659,56 +668,66 @@ export function CajaPage() {
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={PlusCircle}
-            onClick={() => {
-              setMovCategory('Venta Mostrador');
-              setIncomeModalOpen(true);
-            }}
-          >
-            + Registrar Venta / Ingreso
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={MinusCircle}
-            onClick={() => {
-              setMovCategory('Gastos Varios');
-              setExpenseModalOpen(true);
-            }}
-          >
-            - Registrar Egreso / Gasto
-          </Button>
-
-          {isCashOpen ? (
-            <Button
-              variant="danger"
-              size="sm"
-              leftIcon={Lock}
-              onClick={() => setCloseModalOpen(true)}
-            >
-              Cerrar Caja
-            </Button>
-          ) : (
+        {/* Action Buttons (Centered on mobile) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 w-full sm:w-auto">
+          {can('cash.create') && (
             <Button
               variant="primary"
               size="sm"
-              leftIcon={Unlock}
-              onClick={() => setOpenModalOpen(true)}
+              leftIcon={PlusCircle}
+              className="w-full sm:w-auto justify-center h-10 sm:h-9 font-bold text-xs"
+              onClick={() => {
+                setMovCategory('Venta Mostrador');
+                setIncomeModalOpen(true);
+              }}
             >
-              Abrir Turno de Caja
+              + Registrar Venta / Ingreso
             </Button>
+          )}
+          {can('cash.create') && (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={MinusCircle}
+              className="w-full sm:w-auto justify-center h-10 sm:h-9 font-bold text-xs"
+              onClick={() => {
+                setMovCategory('Gastos Varios');
+                setExpenseModalOpen(true);
+              }}
+            >
+              - Registrar Egreso / Gasto
+            </Button>
+          )}
+
+          {can('cash.open_close') && (
+            isCashOpen ? (
+              <Button
+                variant="danger"
+                size="sm"
+                leftIcon={Lock}
+                className="w-full sm:w-auto justify-center h-10 sm:h-9 font-bold text-xs"
+                onClick={() => setCloseModalOpen(true)}
+              >
+                Cerrar Caja
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={Unlock}
+                className="w-full sm:w-auto justify-center h-10 sm:h-9 font-bold text-xs"
+                onClick={() => setOpenModalOpen(true)}
+              >
+                Abrir Turno de Caja
+              </Button>
+            )
           )}
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-3">
-        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-neutral-100 border border-neutral-200">
+      {/* Navigation Tabs (Smooth horizontal scrolling on mobile) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-100 border border-neutral-200 overflow-x-auto max-w-full scrollbar-none">
           <button
             onClick={() => setActiveTab('TODOS')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -735,39 +754,43 @@ export function CajaPage() {
             <span>Turno Actual</span>
             {isCashOpen && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
           </button>
-          <button
-            onClick={() => setActiveTab('MES')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'MES'
-                ? 'bg-white text-neutral-900 shadow-xs'
-                : 'text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            Ingresos por Mes
-          </button>
-          <button
-            onClick={() => setActiveTab('SEMANA')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'SEMANA'
-                ? 'bg-white text-neutral-900 shadow-xs'
-                : 'text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            Ingresos por Semana
-          </button>
-          <button
-            onClick={() => setActiveTab('HISTORIAL')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'HISTORIAL'
-                ? 'bg-white text-neutral-900 shadow-xs'
-                : 'text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            Historial de Cierres
-          </button>
+          {canManageFinancials && (
+            <>
+              <button
+                onClick={() => setActiveTab('MES')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'MES'
+                    ? 'bg-white text-neutral-900 shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                Ingresos por Mes
+              </button>
+              <button
+                onClick={() => setActiveTab('SEMANA')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'SEMANA'
+                    ? 'bg-white text-neutral-900 shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                Ingresos por Semana
+              </button>
+              <button
+                onClick={() => setActiveTab('HISTORIAL')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'HISTORIAL'
+                    ? 'bg-white text-neutral-900 shadow-xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                Historial de Cierres
+              </button>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -779,14 +802,16 @@ export function CajaPage() {
           >
             Exportar Excel
           </Button>
-          <Button
-            variant="default"
-            size="sm"
-            leftIcon={FileText}
-            onClick={handleExportPDF}
-          >
-            PDF Mensual
-          </Button>
+          {canManageFinancials && (
+            <Button
+              variant="default"
+              size="sm"
+              leftIcon={FileText}
+              onClick={handleExportPDF}
+            >
+              PDF Mensual
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1420,24 +1445,36 @@ export function CajaPage() {
                 </div>
 
                 {/* Clear Edit / Delete Buttons on Mobile */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(m)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 transition-colors cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-neutral-600" />
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDelete(m)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    Eliminar
-                  </button>
-                </div>
+                {(can('cash.edit') || can('cash.delete')) ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    {can('cash.edit') && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(m)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-neutral-600" />
+                        Editar
+                      </button>
+                    )}
+                    {can('cash.delete') && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDelete(m)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pt-1 text-right">
+                    <span className="text-[10px] text-neutral-400 font-semibold italic">
+                      Registro protegido
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1455,7 +1492,7 @@ export function CajaPage() {
                 <th className="p-3">Método de Pago</th>
                 <th className="p-3">Usuario</th>
                 <th className="p-3 text-right">Monto</th>
-                <th className="p-3 text-center min-w-[180px]">Acciones</th>
+                <th className="p-3 text-center min-w-[140px]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -1490,28 +1527,38 @@ export function CajaPage() {
                       {formatCurrency(m.amount)}
                     </td>
                     <td className="p-3 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          id={`btn-edit-movement-${m.id}`}
-                          onClick={() => handleOpenEdit(m)}
-                          title="Editar este movimiento"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 hover:border-neutral-400 transition-all shadow-2xs cursor-pointer"
-                        >
-                          <Pencil className="w-3.5 h-3.5 text-neutral-700" />
-                          <span>Editar</span>
-                        </button>
-                        <button
-                          type="button"
-                          id={`btn-delete-movement-${m.id}`}
-                          onClick={() => handleOpenDelete(m)}
-                          title="Eliminar este movimiento"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 hover:border-rose-300 transition-all shadow-2xs cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Eliminar</span>
-                        </button>
-                      </div>
+                      {(can('cash.edit') || can('cash.delete')) ? (
+                        <div className="flex items-center justify-center gap-2">
+                          {can('cash.edit') && (
+                            <button
+                              type="button"
+                              id={`btn-edit-movement-${m.id}`}
+                              onClick={() => handleOpenEdit(m)}
+                              title="Editar este movimiento"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 hover:border-neutral-400 transition-all shadow-2xs cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-neutral-700" />
+                              <span>Editar</span>
+                            </button>
+                          )}
+                          {can('cash.delete') && (
+                            <button
+                              type="button"
+                              id={`btn-delete-movement-${m.id}`}
+                              onClick={() => handleOpenDelete(m)}
+                              title="Eliminar este movimiento"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 hover:border-rose-300 transition-all shadow-2xs cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Eliminar</span>
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-neutral-400 font-medium italic">
+                          Auditado
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

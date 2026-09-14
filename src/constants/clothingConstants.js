@@ -63,3 +63,69 @@ export const EXPENSE_CATEGORIES = [
   'Gastos Varios',
 ];
 
+// Opciones frecuentes de telas/materiales para describir la prenda sin necesidad de foto
+export const CLOTHING_FABRICS = [
+  'Algodón 100% Peinado',
+  'Algodón Rústico / Friza',
+  'Denim / Jean Elastizado',
+  'Denim Rígido / Clásico',
+  'Lino Natural',
+  'Modal / Viscosa',
+  'Morley / Ribb',
+  'Gabardina',
+  'Seda / Satén',
+  'Fibrana Estampada',
+  'Fibrana Lisa',
+  'Poliéster Deportivo / Dry-Fit',
+  'Lana / Tejido de Punto',
+  'Cuero Ecológico / Eco Cuero',
+  'Crepé / Gasa',
+  'Corderoy / Pana',
+  'Rústico con Spandex',
+  'Lycra / Microfibra',
+];
+
+// Ubicaciones comunes de la prenda en el local físico (mostrador / computadoras)
+export const CLOTHING_LOCATIONS = [
+  'Perchero Principal',
+  'Perchero 1 (Entrada)',
+  'Perchero 2 (Centro)',
+  'Perchero 3 (Fondo)',
+  'Perchero Novedades',
+  'Perchero Ofertas / Sale',
+  'Mostrador / Mesa de Doblado',
+  'Estante A (Talles Chicos)',
+  'Estante B (Talles Grandes)',
+  'Vidriera Principal',
+  'Maniquí Interior',
+  'Depósito / Stock Reserva',
+];
+
+// Temporadas
+export const CLOTHING_SEASONS = [
+  'Atemporal (Todo el año)',
+  'Primavera / Verano',
+  'Otoño / Invierno',
+  'Media Estación',
+  'Fiestas / Fin de Año',
+];
+
+// Cortes y estilos de confección
+export const CLOTHING_CUTS = [
+  'Clásico / Regular Fit',
+  'Oversize / Holgado',
+  'Slim / Entallado',
+  'Tiro Alto',
+  'Tiro Medio',
+  'Wide Leg / Pierna Ancha',
+  'Chupín / Skinny',
+  'Cuello Redondo',
+  'Cuello en V',
+  'Manga Corta',
+  'Manga Larga',
+  'Sin Mangas / Musculosa',
+  'Con Capucha / Hoodie',
+  'Corte Recto',
+];
+
+

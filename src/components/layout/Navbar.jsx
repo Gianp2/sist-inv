@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu, Search, CircleDollarSign, ShieldCheck, Bell, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
+import { Menu, Search, CircleDollarSign, ShieldCheck, UserCheck, Bell, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../context/SettingsContext';
@@ -8,22 +8,23 @@ import { useProducts } from '../../hooks/useProducts';
 import { Breadcrumbs } from './Breadcrumbs';
 import { GlobalSearch } from './GlobalSearch';
 import { Badge } from '../ui/Badge';
+import { ROLES } from '../../constants/roles';
 
 export function Navbar({ onMenuClick }) {
-  const { user } = useAuth();
+  const { user, roleLabel, isOwner } = useAuth();
   const { settings } = useSettings();
   const { isCashOpen } = useCashRegister();
-  const { products } = useProducts();
+  const { products = [] } = useProducts();
   const [searchOpen, setSearchOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const alertsRef = useRef(null);
   const navigate = useNavigate();
 
   // Low stock and out of stock calculations
-  const lowStockItems = products.filter(
+  const lowStockItems = (products || []).filter(
     (p) => (p.stock || 0) <= (p.stockMin || 5) && (p.stock || 0) > 0
   );
-  const outOfStockItems = products.filter((p) => (p.stock || 0) === 0);
+  const outOfStockItems = (products || []).filter((p) => (p.stock || 0) === 0);
   const totalAlertsCount =
     (lowStockItems.length > 0 ? 1 : 0) +
     (outOfStockItems.length > 0 ? 1 : 0) +
@@ -94,9 +95,9 @@ export function Navbar({ onMenuClick }) {
 
   return (
     <>
-      <header className="card-panel sticky top-0 z-30 h-16 bg-white border-b border-neutral-200 px-4 sm:px-6 flex items-center justify-between gap-4 text-neutral-900">
+      <header className="card-panel sticky top-0 z-30 h-16 bg-white border-b border-neutral-200 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 text-neutral-900">
         {/* Left Section: Mobile Menu & Breadcrumbs */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
             onClick={onMenuClick}
             className="lg:hidden p-2 rounded-xl text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
@@ -105,7 +106,7 @@ export function Navbar({ onMenuClick }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="lg:hidden flex items-center min-w-0">
-            <span className="text-xs font-bold text-neutral-900 truncate max-w-[130px]" title={settings?.businessName || 'Sistema Inv'}>
+            <span className="text-xs font-bold text-neutral-900 truncate max-w-[110px]" title={settings?.businessName || 'Sistema Inv'}>
               {settings?.businessName || 'Sistema Inv'}
             </span>
           </div>
@@ -115,14 +116,15 @@ export function Navbar({ onMenuClick }) {
         </div>
 
         {/* Middle Section: Global Search trigger */}
-        <div className="flex-1 max-w-md">
+        <div className="flex-1 max-w-md mx-1 sm:mx-0">
           <button
             onClick={() => setSearchOpen(true)}
-            className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-50 text-neutral-700 text-xs transition-colors cursor-pointer border border-neutral-200 shadow-2xs"
+            className="w-full flex items-center justify-between px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-neutral-50 text-neutral-700 text-xs transition-colors cursor-pointer border border-neutral-200 shadow-2xs"
           >
-            <div className="flex items-center gap-2.5">
-              <Search className="w-4 h-4 text-neutral-400" />
-              <span className="text-neutral-700 font-medium">Buscar prendas, SKU, marcas...</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 shrink-0" />
+              <span className="hidden sm:inline text-neutral-700 font-medium truncate">Buscar prendas, SKU, marcas...</span>
+              <span className="sm:hidden text-neutral-600 font-medium text-[11px] truncate">Buscar...</span>
             </div>
             <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-white border border-neutral-200 rounded-md text-neutral-500 shadow-2xs">
               ⌘K
@@ -131,7 +133,38 @@ export function Navbar({ onMenuClick }) {
         </div>
 
         {/* Right Section: Alerts Notification, Admin badge, Cash status */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Quick Cash Status badge */}
+          <button
+            onClick={() => navigate('/caja')}
+            title={isCashOpen ? 'Turno de caja ABIERTO' : 'Caja CERRADA'}
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-colors cursor-pointer ${
+              isCashOpen
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200'
+            }`}
+          >
+            <CircleDollarSign className={`w-3.5 h-3.5 ${isCashOpen ? 'text-emerald-600' : 'text-neutral-500'}`} />
+            <span className="hidden md:inline">{isCashOpen ? 'Caja Abierta' : 'Caja Cerrada'}</span>
+          </button>
+
+          {/* Role Status Badge (Read-only security badge) */}
+          <div
+            title={`Sesión activa: ${roleLabel} (${user?.email || ''})`}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border shadow-2xs select-none ${
+              isOwner
+                ? 'bg-neutral-900 text-white border-neutral-800'
+                : 'bg-blue-50 text-blue-900 border-blue-200'
+            }`}
+          >
+            {isOwner ? (
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            ) : (
+              <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            )}
+            <span className="hidden sm:inline">{roleLabel}</span>
+          </div>
+
           {/* Alerts & Toasts Center Bell */}
           <div className="relative" ref={alertsRef}>
             <button
@@ -147,9 +180,9 @@ export function Navbar({ onMenuClick }) {
               )}
             </button>
 
-            {/* Alerts Dropdown Panel */}
+            {/* Alerts Dropdown Panel (Responsive Width for Mobile) */}
             {alertsOpen && (
-              <div className="card-panel absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl bg-white border border-neutral-200 shadow-xl p-4 space-y-3.5 text-neutral-900 animate-in fade-in zoom-in-95 duration-150">
+              <div className="card-panel fixed sm:absolute right-2 sm:right-0 top-16 sm:top-12 z-50 w-[calc(100vw-1rem)] sm:w-96 max-w-sm rounded-2xl bg-white border border-neutral-200 shadow-xl p-4 space-y-3.5 text-neutral-900 animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between border-b border-neutral-100 pb-2.5">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-xs uppercase tracking-wider text-neutral-800">
@@ -217,8 +250,8 @@ export function Navbar({ onMenuClick }) {
                             {lowStockItems.length} prenda(s) con stock bajo
                           </p>
                           <p className="text-[11px] text-amber-800">
-                            {lowStockItems.slice(0, 2).map((i) => i.name).join(', ')}
-                            {lowStockItems.length > 2 ? ' y más...' : ''}
+                            {(lowStockItems || []).slice(0, 2).map((i) => i.name).join(', ')}
+                            {(lowStockItems || []).length > 2 ? ' y más...' : ''}
                           </p>
                         </div>
                       </div>
@@ -270,26 +303,6 @@ export function Navbar({ onMenuClick }) {
             )}
           </div>
 
-          {/* Admin Pill */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            <Badge variant="neutral" size="sm" className="bg-neutral-900 text-white font-bold">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              {user?.displayName || 'Administrador'}
-            </Badge>
-          </div>
-
-          {/* Cash Shift Status Badge */}
-          <button
-            onClick={() => navigate('/caja')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs ${
-              isCashOpen
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
-            }`}
-          >
-            <CircleDollarSign className="w-3.5 h-3.5" />
-            <span>{isCashOpen ? 'Caja Abierta' : 'Caja Cerrada'}</span>
-          </button>
         </div>
       </header>
 

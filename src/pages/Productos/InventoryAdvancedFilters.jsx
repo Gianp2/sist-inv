@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { CLOTHING_SIZES, CLOTHING_COLORS } from '../../constants/clothingConstants';
 import { formatCurrency } from '../../utils/formatters';
+import { sanitizeNumericValue, handleNumericFocus } from '../../utils/numericUtils';
 
 const PRICE_PRESETS = [
   { label: 'Hasta $5.000', min: '', max: '5000' },
@@ -284,7 +285,8 @@ export function InventoryAdvancedFilters({
                     min="0"
                     placeholder="Mínimo"
                     value={filters.minPrice ?? ''}
-                    onChange={(e) => onFilterChange({ minPrice: e.target.value })}
+                    onFocus={handleNumericFocus}
+                    onChange={(e) => onFilterChange({ minPrice: sanitizeNumericValue(e.target.value) })}
                     className="w-full pl-6 pr-2 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono"
                   />
                 </div>
@@ -297,7 +299,8 @@ export function InventoryAdvancedFilters({
                     min="0"
                     placeholder="Máximo"
                     value={filters.maxPrice ?? ''}
-                    onChange={(e) => onFilterChange({ maxPrice: e.target.value })}
+                    onFocus={handleNumericFocus}
+                    onChange={(e) => onFilterChange({ maxPrice: sanitizeNumericValue(e.target.value) })}
                     className="w-full pl-6 pr-2 py-1.5 text-xs rounded-lg border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900 font-mono"
                   />
                 </div>

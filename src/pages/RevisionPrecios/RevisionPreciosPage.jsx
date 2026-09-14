@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCatalog';
+import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import {
   getProductAging,
@@ -51,6 +52,8 @@ export default function RevisionPreciosPage() {
     batchUpdatePrices,
   } = useProducts();
   const { categories } = useCategories();
+  const { can, isAdmin } = useAuth();
+  const canViewCosts = isAdmin || can('costs.view');
 
   // Filters & State
   const [searchTerm, setSearchTerm] = useState('');
@@ -704,7 +707,9 @@ export default function RevisionPreciosPage() {
 
                     {/* Unit Cost */}
                     <td className="p-3 text-right">
-                      {p.hasCost ? (
+                      {!canViewCosts ? (
+                        <span className="text-[11px] text-neutral-400 italic">Restringido</span>
+                      ) : p.hasCost ? (
                         <div>
                           <span className="font-black text-neutral-900 block text-xs">
                             {formatCurrency(p.currentCost)}
@@ -742,7 +747,9 @@ export default function RevisionPreciosPage() {
 
                     {/* Profitability Margin */}
                     <td className="p-3 text-right">
-                      {p.profit.isValid ? (
+                      {!canViewCosts ? (
+                        <span className="text-[11px] text-neutral-400 italic">Restringido</span>
+                      ) : p.profit.isValid ? (
                         <div className="space-y-0.5">
                           <span
                             className={`font-black text-xs block ${

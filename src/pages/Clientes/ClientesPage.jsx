@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Users, Search, Phone, Mail, FileSpreadsheet } from 'lucide-react';
 import { useCustomers } from '../../hooks/useContacts';
+import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
@@ -11,6 +12,7 @@ import { exportToExcel } from '../../utils/exportUtils';
 import { toast } from 'sonner';
 
 export function ClientesPage() {
+  const { can } = useAuth();
   const { customers, loading, createCustomer, editCustomer, removeCustomer } = useCustomers();
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -86,7 +88,7 @@ export function ClientesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Clientes
@@ -95,18 +97,20 @@ export function ClientesPage() {
             Gestión de clientes y fidelización para el local
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" leftIcon={FileSpreadsheet} onClick={handleExportExcel}>
+        <div className="flex items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" leftIcon={FileSpreadsheet} onClick={handleExportExcel} className="w-full sm:w-auto justify-center">
             Exportar
           </Button>
-          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
-            Nuevo Cliente
-          </Button>
+          {can('customers.create') && (
+            <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate} className="w-full sm:w-auto justify-center">
+              Nuevo Cliente
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 p-4 shadow-xs">
-        <div className="relative max-w-md mb-4">
+        <div className="relative max-w-md mb-4 mx-auto sm:mx-0">
           <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
           <input
             type="text"
@@ -120,69 +124,138 @@ export function ClientesPage() {
         {loading ? (
           <TableSkeleton rows={5} cols={5} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
-                <tr>
-                  <th className="p-3">Cliente</th>
-                  <th className="p-3">DNI / CUIT</th>
-                  <th className="p-3">Contacto</th>
-                  <th className="p-3">Total Comprado</th>
-                  <th className="p-3">Compras</th>
-                  <th className="p-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {filtered.map((c) => (
-                  <tr key={c.id} className="hover:bg-neutral-50/80 transition-colors">
-                    <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-neutral-200 text-neutral-800 flex items-center justify-center text-xs font-black">
+          <>
+            {/* Mobile View: Client Cards */}
+            <div className="md:hidden divide-y divide-neutral-200">
+              {filtered.map((c) => (
+                <div key={c.id} className="py-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center text-sm font-black border border-neutral-200">
                         {c.name?.charAt(0) || 'C'}
                       </div>
                       <div>
-                        <p>{c.name || 'Cliente'}</p>
-                        <p className="text-[10px] text-neutral-500 font-medium">{c.city || 'Local'}</p>
+                        <p className="font-bold text-sm text-neutral-900">{c.name || 'Cliente'}</p>
+                        <p className="text-[11px] text-neutral-500 font-medium font-mono">DNI: {c.dni || 'Sin DNI'}</p>
                       </div>
-                    </td>
-                    <td className="p-3 font-mono text-neutral-700 font-medium">{c.dni || '-'}</td>
-                    <td className="p-3">
-                      <p className="text-neutral-900 font-medium">{c.phone || '-'}</p>
-                      <p className="text-[10px] text-neutral-500 font-medium">{c.email || ''}</p>
-                    </td>
-                    <td className="p-3 font-black text-neutral-900">
-                      {formatCurrency(c.totalPurchases || 0)}
-                    </td>
-                    <td className="p-3 font-semibold text-neutral-800">{c.purchaseCount || 0} compras</td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-black text-neutral-900">{formatCurrency(c.totalPurchases || 0)}</p>
+                      <p className="text-[10px] text-neutral-500">{c.purchaseCount || 0} compras</p>
+                    </div>
+                  </div>
+
+                  {(c.phone || c.email) && (
+                    <div className="text-xs text-neutral-600 flex items-center gap-3">
+                      {c.phone && <span>Tel: {c.phone}</span>}
+                      {c.city && <span>• {c.city}</span>}
+                    </div>
+                  )}
+
+                  {(can('customers.edit') || can('customers.delete')) && (
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-neutral-100">
+                      {can('customers.edit') && (
                         <button
                           onClick={() => handleOpenEdit(c)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Editar"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Editar</span>
                         </button>
+                      )}
+                      {can('customers.delete') && (
                         <button
                           onClick={() => setDeletingId(c.id)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Eliminar"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="p-8 text-center text-neutral-400 text-xs">
+                  No se encontraron clientes registrados
+                </div>
+              )}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-neutral-400 text-xs">
-                      No se encontraron clientes registrados
-                    </td>
+                    <th className="p-3">Cliente</th>
+                    <th className="p-3">DNI / CUIT</th>
+                    <th className="p-3">Contacto</th>
+                    <th className="p-3">Total Comprado</th>
+                    <th className="p-3">Compras</th>
+                    {(can('customers.edit') || can('customers.delete')) && (
+                      <th className="p-3 text-right">Acciones</th>
+                    )}
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {filtered.map((c) => (
+                    <tr key={c.id} className="hover:bg-neutral-50/80 transition-colors">
+                      <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-neutral-200 text-neutral-800 flex items-center justify-center text-xs font-black">
+                          {c.name?.charAt(0) || 'C'}
+                        </div>
+                        <div>
+                          <p>{c.name || 'Cliente'}</p>
+                          <p className="text-[10px] text-neutral-500 font-medium">{c.city || 'Local'}</p>
+                        </div>
+                      </td>
+                      <td className="p-3 font-mono text-neutral-700 font-medium">{c.dni || '-'}</td>
+                      <td className="p-3">
+                        <p className="text-neutral-900 font-medium">{c.phone || '-'}</p>
+                        <p className="text-[10px] text-neutral-500 font-medium">{c.email || ''}</p>
+                      </td>
+                      <td className="p-3 font-black text-neutral-900">
+                        {formatCurrency(c.totalPurchases || 0)}
+                      </td>
+                      <td className="p-3 font-semibold text-neutral-800">{c.purchaseCount || 0} compras</td>
+                      {(can('customers.edit') || can('customers.delete')) && (
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {can('customers.edit') && (
+                              <button
+                                onClick={() => handleOpenEdit(c)}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            {can('customers.delete') && (
+                              <button
+                                onClick={() => setDeletingId(c.id)}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-neutral-400 text-xs">
+                        No se encontraron clientes registrados
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

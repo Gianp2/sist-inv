@@ -6,6 +6,8 @@ import { useCategories, useBrands } from '../../hooks/useCatalog';
 import { ProductFormModal } from './ProductFormModal';
 import { ProductDetailModal } from './ProductDetailModal';
 import { InventoryAdvancedFilters } from './InventoryAdvancedFilters';
+import { ProductVisualBadge, GarmentSpecsPills } from '../../components/common/ProductVisualBadge';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { TableSkeleton } from '../../components/ui/Skeleton';
@@ -27,6 +29,7 @@ const DEFAULT_FILTERS = {
 
 export function ProductosPage() {
   const navigate = useNavigate();
+  const { can } = useAuth();
   const { products, loading, createProduct, editProduct, removeProduct, clearProducts } = useProducts();
   const { categories } = useCategories();
   const { brands } = useBrands();
@@ -165,18 +168,23 @@ export function ProductosPage() {
   };
 
   const handleExportExcel = () => {
-    const data = filteredProducts.map((p) => ({
-      Nombre: p.name,
-      SKU: p.sku,
-      CódigoBarras: p.barcode,
-      Categoría: p.categoryName,
-      Marca: p.brandName,
-      PrecioCosto: p.costPrice,
-      PrecioVenta: p.salePrice,
-      StockTotal: p.stock,
-      StockMinimo: p.stockMin,
-      VariantesCount: p.variants?.length || 0,
-    }));
+    const data = filteredProducts.map((p) => {
+      const row = {
+        Nombre: p.name,
+        SKU: p.sku,
+        CódigoBarras: p.barcode,
+        Categoría: p.categoryName,
+        Marca: p.brandName,
+      };
+      if (can('costs.view')) {
+        row['PrecioCosto'] = p.costPrice;
+      }
+      row['PrecioVenta'] = p.salePrice;
+      row['StockTotal'] = p.stock;
+      row['StockMinimo'] = p.stockMin;
+      row['VariantesCount'] = p.variants?.length || 0;
+      return row;
+    });
     exportToExcel(data, 'Catalogo_Productos.xlsx', 'Productos');
     toast.success('Catálogo exportado a Excel');
   };
@@ -184,7 +192,7 @@ export function ProductosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Catálogo de Productos
@@ -193,8 +201,8 @@ export function ProductosPage() {
             Gestión completa de prendas, talles, colores y precios
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {products.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+          {products.length > 0 && can('products.clear') && (
             <Button
               variant="outline"
               size="sm"
@@ -208,18 +216,22 @@ export function ProductosPage() {
           <Button variant="outline" size="sm" leftIcon={Download} onClick={handleExportExcel}>
             Exportar Excel
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={TrendingUp}
-            onClick={() => navigate('/revision-precios')}
-            className="border-neutral-300 text-neutral-800 hover:bg-neutral-50"
-          >
-            Revisión de Precios
-          </Button>
-          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
-            Nuevo Producto
-          </Button>
+          {can('pricing.manage') && (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={TrendingUp}
+              onClick={() => navigate('/revision-precios')}
+              className="border-neutral-300 text-neutral-800 hover:bg-neutral-50"
+            >
+              Revisión de Precios
+            </Button>
+          )}
+          {can('products.create') && (
+            <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+              Nuevo Producto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -235,18 +247,115 @@ export function ProductosPage() {
         filteredCount={filteredProducts.length}
       />
 
-      {/* Table */}
+      {/* Table & Mobile Cards */}
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-6">
             <TableSkeleton rows={6} cols={6} />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Mobile View: Clean Touch-Friendly Cards */}
+            <div className="md:hidden divide-y divide-neutral-200">
+              {paginatedProducts.map((p) => (
+                <div key={p.id} className="p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <ProductVisualBadge product={p} size="lg" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="font-bold text-sm text-neutral-900 truncate">{p.name}</p>
+                        <Badge
+                          size="sm"
+                          variant={p.stock === 0 ? 'danger' : p.stock <= (p.stockMin || 5) ? 'warning' : 'success'}
+                        >
+                          {p.stock === 0 ? 'Agotado' : `${p.stock} u.`}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 font-medium">{p.categoryName} • {p.brandName}</p>
+                      <p className="text-xs font-black text-neutral-900 mt-1">{formatCurrency(p.salePrice)}</p>
+                    </div>
+                  </div>
+
+                  {/* Garment specs (Location & Fabric) */}
+                  <GarmentSpecsPills product={p} />
+
+                  {/* Variants Pills */}
+                  {(() => {
+                    const validVariants = (p.variants || []).filter((v) => {
+                      if (!v) return false;
+                      if (typeof v === 'string') return v.trim().length > 0;
+                      return v.color || v.size || v.sku || typeof v.stock === 'number';
+                    });
+                    if (validVariants.length === 0) return null;
+
+                    return (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {validVariants.slice(0, 4).map((v, i) => {
+                          const colorPart = typeof v === 'object' && v?.color ? String(v.color).slice(0, 3) : '';
+                          const sizePart = typeof v === 'object' ? (v?.size || '') : '';
+                          const label = [colorPart, sizePart].filter(Boolean).join('/') || (typeof v === 'string' ? v.slice(0, 5) : 'Var');
+                          const stockCount = typeof v === 'object' ? (v?.stock ?? 0) : 0;
+                          return (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-neutral-100 border border-neutral-200 text-neutral-800"
+                            >
+                              {label} ({stockCount})
+                            </span>
+                          );
+                        })}
+                        {validVariants.length > 4 && (
+                          <span className="text-[10px] text-neutral-500 font-bold">
+                            +{validVariants.length - 4} más
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Card Actions */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
+                    <button
+                      onClick={() => setViewingProduct(p)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Ver</span>
+                    </button>
+                    {can('products.edit') && (
+                      <button
+                        onClick={() => handleOpenEdit(p)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
+                      </button>
+                    )}
+                    {can('products.delete') && (
+                      <button
+                        onClick={() => setDeletingId(p.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {filteredProducts.length === 0 && (
+                <div className="p-8 text-center text-xs text-neutral-500">
+                  No se encontraron prendas con los filtros aplicados.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
                 <tr>
-                  <th className="p-4">Prenda / Foto</th>
+                  <th className="p-4">Prenda / Ficha</th>
                   <th className="p-4">Categoría / Marca</th>
                   <th className="p-4">Precio Venta</th>
                   <th className="p-4">Variantes</th>
@@ -259,14 +368,29 @@ export function ProductosPage() {
                   <tr key={p.id} className="hover:bg-neutral-50/80 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=100&q=80'}
-                          alt={p.name}
-                          className="w-10 h-10 rounded-xl object-cover bg-neutral-100 border border-neutral-200"
-                        />
+                        <ProductVisualBadge product={p} size="sm" />
                         <div>
-                          <p className="font-bold text-neutral-900">{p.name}</p>
-                          <p className="text-[10px] text-neutral-500 font-mono">SKU: {p.sku}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-bold text-neutral-900">{p.name}</p>
+                            {!p.images?.[0] && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 border border-neutral-200">
+                                Sin foto
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-neutral-500 font-medium flex-wrap mt-0.5">
+                            <span className="font-mono">SKU: {p.sku}</span>
+                            {p.location && (
+                              <span className="text-neutral-700 bg-neutral-100 px-1.5 py-0.5 rounded font-semibold">
+                                📍 {p.location}
+                              </span>
+                            )}
+                            {p.fabric && (
+                              <span className="text-neutral-600">
+                                🧵 {p.fabric}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -278,21 +402,40 @@ export function ProductosPage() {
                       {formatCurrency(p.salePrice)}
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-1 flex-wrap max-w-xs">
-                        {p.variants?.slice(0, 4).map((v, i) => (
-                          <span
-                            key={i}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white border border-neutral-200 text-neutral-800"
-                          >
-                            {v.color.slice(0, 3)}/{v.size} ({v.stock})
-                          </span>
-                        ))}
-                        {(p.variants?.length || 0) > 4 && (
-                          <span className="text-[10px] text-neutral-500 font-bold">
-                            +{p.variants.length - 4} más
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const validVariants = (p.variants || []).filter((v) => {
+                          if (!v) return false;
+                          if (typeof v === 'string') return v.trim().length > 0;
+                          return v.color || v.size || v.sku || typeof v.stock === 'number';
+                        });
+                        if (validVariants.length === 0) {
+                          return <span className="text-xs text-neutral-400 italic">Sin variantes</span>;
+                        }
+
+                        return (
+                          <div className="flex items-center gap-1 flex-wrap max-w-xs">
+                            {validVariants.slice(0, 4).map((v, i) => {
+                              const colorPart = typeof v === 'object' && v?.color ? String(v.color).slice(0, 3) : '';
+                              const sizePart = typeof v === 'object' ? (v?.size || '') : '';
+                              const label = [colorPart, sizePart].filter(Boolean).join('/') || (typeof v === 'string' ? v.slice(0, 5) : 'Var');
+                              const stockCount = typeof v === 'object' ? (v?.stock ?? 0) : 0;
+                              return (
+                                <span
+                                  key={i}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white border border-neutral-200 text-neutral-800"
+                                >
+                                  {label} ({stockCount})
+                                </span>
+                              );
+                            })}
+                            {validVariants.length > 4 && (
+                              <span className="text-[10px] text-neutral-500 font-bold">
+                                +{validVariants.length - 4} más
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="p-4 text-center">
                       <Badge
@@ -307,24 +450,28 @@ export function ProductosPage() {
                         <button
                           onClick={() => setViewingProduct(p)}
                           className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Ver detalle"
+                          title="Ver detalle de prenda"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleOpenEdit(p)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(p.id)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {can('products.edit') && (
+                          <button
+                            onClick={() => handleOpenEdit(p)}
+                            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                            title="Editar prenda"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {can('products.delete') && (
+                          <button
+                            onClick={() => setDeletingId(p.id)}
+                            className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                            title="Eliminar prenda"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -343,17 +490,19 @@ export function ProductosPage() {
                               El sistema está nuevo y listo para usar. Comienza cargando tu primera prenda con sus talles, colores y precios.
                             </p>
                           </div>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            leftIcon={Plus}
-                            onClick={() => {
-                              setEditingProduct(null);
-                              setModalOpen(true);
-                            }}
-                          >
-                            Nueva Prenda
-                          </Button>
+                          {can('products.create') && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              leftIcon={Plus}
+                              onClick={() => {
+                                setEditingProduct(null);
+                                setModalOpen(true);
+                              }}
+                            >
+                              Nueva Prenda
+                            </Button>
+                          )}
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
@@ -382,6 +531,7 @@ export function ProductosPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* Pagination Bar */}

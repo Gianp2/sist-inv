@@ -1,6 +1,7 @@
 import { formatCurrency } from '../../utils/formatters';
-import { CircleDollarSign, TrendingUp, TrendingDown, AlertTriangle, Boxes, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { CircleDollarSign, TrendingUp, TrendingDown, AlertTriangle, Boxes, ArrowUpRight, Shirt, ShoppingBag } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { useAuth } from '../../context/AuthContext';
 
 export function StatCards({
   todayIncome = 0,
@@ -9,39 +10,85 @@ export function StatCards({
   totalStockUnits = 0,
   lowStockCount = 0,
   outOfStockCount = 0,
+  todaySalesCount = 0,
+  productsCount = 0,
 }) {
-  const stats = [
-    {
-      title: 'Ingresos de Hoy',
-      value: formatCurrency(todayIncome),
-      subtitle: 'Total recaudado hoy',
-      icon: CircleDollarSign,
-      color: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
-    },
-    {
-      title: 'Ingresos del Mes',
-      value: formatCurrency(monthIncome),
-      subtitle: 'Recaudación mensual acumulada',
-      icon: TrendingUp,
-      color: 'bg-neutral-100 text-neutral-900 border border-neutral-200',
-    },
-    {
-      title: 'Gastos / Egresos del Mes',
-      value: formatCurrency(monthExpense),
-      subtitle: 'Salidas y pagos del mes',
-      icon: TrendingDown,
-      color: 'bg-rose-50 text-rose-800 border border-rose-200',
-    },
-    {
-      title: 'Stock Total & Alertas',
-      value: `${totalStockUnits} prendas`,
-      subtitle: lowStockCount + outOfStockCount > 0 ? `${lowStockCount} bajos / ${outOfStockCount} agotados` : 'Stock en nivel óptimo',
-      icon: lowStockCount + outOfStockCount > 0 ? AlertTriangle : Boxes,
-      color: lowStockCount + outOfStockCount > 0
-        ? 'bg-amber-50 text-amber-800 border border-amber-200'
-        : 'bg-neutral-100 text-neutral-900 border border-neutral-200',
-    },
-  ];
+  const { can } = useAuth();
+  const canSeeFinancials = can('dashboard.financials');
+
+  const stats = canSeeFinancials
+    ? [
+        {
+          title: 'Ingresos de Hoy',
+          value: formatCurrency(todayIncome),
+          subtitle: 'Total recaudado hoy',
+          icon: CircleDollarSign,
+          color: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+        },
+        {
+          title: 'Ingresos del Mes',
+          value: formatCurrency(monthIncome),
+          subtitle: 'Recaudación mensual acumulada',
+          icon: TrendingUp,
+          color: 'bg-neutral-100 text-neutral-900 border border-neutral-200',
+        },
+        {
+          title: 'Gastos / Egresos del Mes',
+          value: formatCurrency(monthExpense),
+          subtitle: 'Salidas y pagos del mes',
+          icon: TrendingDown,
+          color: 'bg-rose-50 text-rose-800 border border-rose-200',
+        },
+        {
+          title: 'Stock Total & Alertas',
+          value: `${totalStockUnits} prendas`,
+          subtitle:
+            lowStockCount + outOfStockCount > 0
+              ? `${lowStockCount} bajos / ${outOfStockCount} agotados`
+              : 'Stock en nivel óptimo',
+          icon: lowStockCount + outOfStockCount > 0 ? AlertTriangle : Boxes,
+          color:
+            lowStockCount + outOfStockCount > 0
+              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+              : 'bg-neutral-100 text-neutral-900 border border-neutral-200',
+        },
+      ]
+    : [
+        {
+          title: 'Caja / Cobrado Hoy',
+          value: formatCurrency(todayIncome),
+          subtitle: todaySalesCount > 0 ? `${todaySalesCount} ventas registradas hoy` : 'Cobros registrados en el turno',
+          icon: CircleDollarSign,
+          color: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+        },
+        {
+          title: 'Prendas Físicas en Stock',
+          value: `${totalStockUnits} unidades`,
+          subtitle: 'Disponibles para la venta',
+          icon: Boxes,
+          color: 'bg-neutral-100 text-neutral-900 border border-neutral-200',
+        },
+        {
+          title: 'Prendas por Reponer',
+          value: `${lowStockCount + outOfStockCount} modelos`,
+          subtitle:
+            lowStockCount + outOfStockCount > 0
+              ? `${lowStockCount} stock bajo • ${outOfStockCount} sin stock`
+              : 'Stock óptimo en todos los modelos',
+          icon: AlertTriangle,
+          color:
+            lowStockCount + outOfStockCount > 0
+              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+              : 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+        },
+        {
+          title: 'Catálogo de Modelos',
+          value: `${productsCount} prendas`,
+          subtitle: 'Variantes y talles en exhibición',
+          icon: Shirt,
+          color: 'bg-neutral-100 text-neutral-900 border border-neutral-200',
+        },
+      ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

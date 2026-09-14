@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettings } from '../../hooks/useSettingsAndUsers';
+import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -7,10 +8,12 @@ import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { seedInitialData } from '../../services/api/seedData';
 import { clearAllMovementsAndShifts, resetEntireSystemToFresh } from '../../services/firebase/firestore';
-import { Store, Database, Save, PackagePlus, RotateCcw, Trash2, Sparkles } from 'lucide-react';
+import { Store, Database, Save, PackagePlus, RotateCcw, Trash2, Sparkles, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function ConfiguracionPage() {
+  const { can, isAdmin } = useAuth();
+  const canEdit = isAdmin || can('settings.edit');
   const { settings, loading, saveSettings } = useSettings();
   const [formData, setFormData] = useState(settings || {});
   const [isSaving, setIsSaving] = useState(false);
@@ -251,103 +254,114 @@ export function ConfiguracionPage() {
         </Card>
 
         {/* Database initial bootstrap & reset */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="p-5 bg-white border-neutral-200 shadow-xs">
-            <div className="flex flex-col justify-between h-full gap-3">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-800 shrink-0 border border-neutral-200">
-                  <Database className="w-5 h-5" />
+        {canEdit && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-5 bg-white border-neutral-200 shadow-xs">
+                <div className="flex flex-col justify-between h-full gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-800 shrink-0 border border-neutral-200">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-neutral-900">
+                        Poblar Catálogo de Muestra
+                      </h4>
+                      <p className="text-xs text-neutral-600 mt-0.5 font-medium">
+                        Genera productos, talles y categorías de indumentaria base si el catálogo está vacío.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={PackagePlus}
+                      onClick={() => setConfirmSeedOpen(true)}
+                      isLoading={isSeeding}
+                    >
+                      Cargar Catálogo Base
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-neutral-900">
-                    Poblar Catálogo de Muestra
-                  </h4>
-                  <p className="text-xs text-neutral-600 mt-0.5 font-medium">
-                    Genera productos, talles y categorías de indumentaria base si el catálogo está vacío.
-                  </p>
+              </Card>
+
+              <Card className="p-5 bg-white border-neutral-200 shadow-xs">
+                <div className="flex flex-col justify-between h-full gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-800 shrink-0 border border-neutral-200">
+                      <RotateCcw className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-neutral-900">
+                        Dejar Caja y Movimientos en Cero
+                      </h4>
+                      <p className="text-xs text-neutral-600 mt-0.5 font-medium">
+                        Elimina todos los ingresos, egresos y turnos de ejemplo para dejar la caja limpia y nueva para usar.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-rose-700 hover:bg-rose-50 border-neutral-200"
+                      leftIcon={RotateCcw}
+                      onClick={() => setConfirmClearOpen(true)}
+                      isLoading={isClearing}
+                    >
+                      Limpiar Caja a Cero
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex justify-end pt-2">
+              </Card>
+            </div>
+
+            {/* Full System Factory Reset Card */}
+            <Card className="p-5 bg-white border-neutral-200 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-800 shrink-0 border border-neutral-200">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-neutral-900">
+                      Restablecer Todo el Sistema a Cero (Limpieza Total)
+                    </h4>
+                    <p className="text-xs text-neutral-600 mt-0.5 font-medium">
+                      Elimina todas las prendas de muestra, clientes, proveedores, compras y ventas para dejar la tienda 100% nueva y vacía.
+                    </p>
+                  </div>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  leftIcon={PackagePlus}
-                  onClick={() => setConfirmSeedOpen(true)}
-                  isLoading={isSeeding}
+                  className="text-neutral-900 hover:bg-neutral-50 border-neutral-200 whitespace-nowrap"
+                  leftIcon={Trash2}
+                  onClick={() => setConfirmResetAllOpen(true)}
+                  isLoading={isResettingAll}
                 >
-                  Cargar Catálogo Base
+                  Restablecer Sistema a Cero
                 </Button>
               </div>
-            </div>
-          </Card>
-
-          <Card className="p-5 bg-white border-neutral-200 shadow-xs">
-            <div className="flex flex-col justify-between h-full gap-3">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-800 shrink-0 border border-neutral-200">
-                  <RotateCcw className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-neutral-900">
-                    Dejar Caja y Movimientos en Cero
-                  </h4>
-                  <p className="text-xs text-neutral-600 mt-0.5 font-medium">
-                    Elimina todos los ingresos, egresos y turnos de ejemplo para dejar la caja limpia y nueva para usar.
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-rose-700 hover:bg-rose-50 border-neutral-200"
-                  leftIcon={RotateCcw}
-                  onClick={() => setConfirmClearOpen(true)}
-                  isLoading={isClearing}
-                >
-                  Limpiar Caja a Cero
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Full System Factory Reset Card */}
-        <Card className="p-5 bg-white border-neutral-200 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-800 shrink-0 border border-neutral-200">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-neutral-900">
-                  Restablecer Todo el Sistema a Cero (Limpieza Total)
-                </h4>
-                <p className="text-xs text-neutral-600 mt-0.5 font-medium">
-                  Elimina todas las prendas de muestra, clientes, proveedores, compras y ventas para dejar la tienda 100% nueva y vacía.
-                </p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-neutral-900 hover:bg-neutral-50 border-neutral-200 whitespace-nowrap"
-              leftIcon={Trash2}
-              onClick={() => setConfirmResetAllOpen(true)}
-              isLoading={isResettingAll}
-            >
-              Restablecer Sistema a Cero
-            </Button>
-          </div>
-        </Card>
+            </Card>
+          </>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="submit" variant="primary" size="md" leftIcon={Save} isLoading={isSaving}>
-            Guardar Configuración
-          </Button>
+          {canEdit ? (
+            <Button type="submit" variant="primary" size="md" leftIcon={Save} isLoading={isSaving}>
+              Guardar Configuración
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-neutral-500 bg-neutral-100 px-3 py-2 rounded-xl">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Modo sólo lectura. Se requiere el permiso <code>settings.edit</code> para modificar la configuración.</span>
+            </div>
+          )}
         </div>
       </form>
 

@@ -6,6 +6,13 @@ import { Select } from '../../components/ui/Select';
 import { ImageUpload } from '../../components/common/ImageUpload';
 import { ProductVariantManager } from './ProductVariantManager';
 import { generateSKU, generateBarcode } from '../../utils/calculations';
+import {
+  CLOTHING_FABRICS,
+  CLOTHING_LOCATIONS,
+  CLOTHING_SEASONS,
+  CLOTHING_CUTS,
+} from '../../constants/clothingConstants';
+import { Shirt, Sparkles, MapPin, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function ProductFormModal({
@@ -31,6 +38,11 @@ export function ProductFormModal({
     discount: 0,
     stockMin: 5,
     entryDate: '',
+    fabric: '',
+    location: '',
+    season: 'Atemporal (Todo el año)',
+    cutStyle: '',
+    distinctiveDetails: '',
     images: [],
     variants: [],
     active: true,
@@ -54,6 +66,11 @@ export function ProductFormModal({
         brandId: initialProduct.brandId || brands.find((b) => b.name === initialProduct.brandName)?.id || '',
         brandName: initialProduct.brandName || brands.find((b) => b.id === initialProduct.brandId)?.name || '',
         entryDate: formattedEntryDate,
+        fabric: initialProduct.fabric || '',
+        location: initialProduct.location || '',
+        season: initialProduct.season || 'Atemporal (Todo el año)',
+        cutStyle: initialProduct.cutStyle || '',
+        distinctiveDetails: initialProduct.distinctiveDetails || '',
         variants: initialProduct.variants || [],
         images: initialProduct.images || [],
       });
@@ -75,6 +92,11 @@ export function ProductFormModal({
         discount: 0,
         stockMin: 5,
         entryDate: new Date().toISOString().split('T')[0],
+        fabric: '',
+        location: '',
+        season: 'Atemporal (Todo el año)',
+        cutStyle: '',
+        distinctiveDetails: '',
         images: [],
         variants: [],
         active: true,
@@ -119,7 +141,19 @@ export function ProductFormModal({
 
     setLoading(true);
     try {
-      await onSave(formData);
+      const payload = {
+        ...formData,
+        costPrice: Number(formData.costPrice) || 0,
+        salePrice: Number(formData.salePrice) || 0,
+        wholesalePrice: Number(formData.wholesalePrice) || 0,
+        discount: Number(formData.discount) || 0,
+        stockMin: Number(formData.stockMin) || 0,
+        variants: (formData.variants || []).map((v) => ({
+          ...v,
+          stock: Number(v.stock) || 0,
+        })),
+      };
+      await onSave(payload);
       onClose();
     } catch (error) {
       console.error(error);
@@ -132,23 +166,16 @@ export function ProductFormModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialProduct ? 'Editar Producto' : 'Nuevo Producto de Ropa'}
-      subtitle="Define talles, colores, precios y fotos con Cloudinary"
+      title={initialProduct ? 'Editar Prenda' : 'Nueva Prenda de Ropa'}
+      subtitle="Define talles, colores, detalles de confección, ubicación en local y precios"
       maxWidth="max-w-3xl"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Images with Cloudinary */}
-        <ImageUpload
-          images={formData.images}
-          onChange={(newImages) => handleChange('images', newImages)}
-          maxImages={5}
-        />
-
-        {/* Basic Info */}
+        {/* 1. Datos Principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Nombre de la Prenda *"
-            placeholder="Ej: Remera Oversize Estampada"
+            placeholder="Ej: Remera Oversize Básica"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
             required
@@ -168,7 +195,7 @@ export function ProductFormModal({
           </div>
         </div>
 
-        {/* Category & Brand */}
+        {/* 2. Categoría & Marca */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select
             label="Categoría *"
@@ -197,7 +224,99 @@ export function ProductFormModal({
           </Select>
         </div>
 
-        {/* Prices & Stock Alert */}
+        {/* 3. Ficha Descriptiva de la Prenda (Identificación sin foto) */}
+        <div className="p-4 rounded-2xl bg-neutral-50/80 border border-neutral-200 space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <div className="flex items-center gap-2">
+              <Shirt className="w-4 h-4 text-neutral-800" />
+              <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                Ficha de Detalle y Reconocimiento Físico
+              </h4>
+            </div>
+            <span className="text-[11px] text-neutral-500 font-medium">
+              Ideal para computadoras de mostrador
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1">
+                Tela / Material
+              </label>
+              <input
+                list="fabric-options"
+                placeholder="Ej: Algodón peinado, Lino, Denim..."
+                value={formData.fabric || ''}
+                onChange={(e) => handleChange('fabric', e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              />
+              <datalist id="fabric-options">
+                {CLOTHING_FABRICS.map((fab, idx) => (
+                  <option key={idx} value={fab} />
+                ))}
+              </datalist>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1">
+                Ubicación en el Local / Perchero
+              </label>
+              <input
+                list="location-options"
+                placeholder="Ej: Perchero 1, Mostrador, Vidriera..."
+                value={formData.location || ''}
+                onChange={(e) => handleChange('location', e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              />
+              <datalist id="location-options">
+                {CLOTHING_LOCATIONS.map((loc, idx) => (
+                  <option key={idx} value={loc} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1">
+                Corte o Estilo
+              </label>
+              <input
+                list="cut-options"
+                placeholder="Ej: Clásico, Oversize, Slim, Tiro Alto..."
+                value={formData.cutStyle || ''}
+                onChange={(e) => handleChange('cutStyle', e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              />
+              <datalist id="cut-options">
+                {CLOTHING_CUTS.map((cut, idx) => (
+                  <option key={idx} value={cut} />
+                ))}
+              </datalist>
+            </div>
+
+            <Select
+              label="Temporada"
+              value={formData.season || 'Atemporal (Todo el año)'}
+              onChange={(e) => handleChange('season', e.target.value)}
+            >
+              {CLOTHING_SEASONS.map((seas, idx) => (
+                <option key={idx} value={seas}>
+                  {seas}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <Input
+            label="Detalle Distintivo / Confección (Opcional)"
+            placeholder="Ej: Estampa en espalda, botones metálicos, bolsillos laterales, cuello en V"
+            value={formData.distinctiveDetails || ''}
+            onChange={(e) => handleChange('distinctiveDetails', e.target.value)}
+          />
+        </div>
+
+        {/* 4. Precios & Stock Alert */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Input
             label="Precio Costo ($)"
@@ -205,7 +324,7 @@ export function ProductFormModal({
             min="0"
             step="10"
             value={formData.costPrice}
-            onChange={(e) => handleChange('costPrice', Number(e.target.value))}
+            onChange={(e) => handleChange('costPrice', e.target.value === '' ? '' : Number(e.target.value))}
           />
           <Input
             label="Precio Venta ($) *"
@@ -213,7 +332,7 @@ export function ProductFormModal({
             min="0"
             step="10"
             value={formData.salePrice}
-            onChange={(e) => handleChange('salePrice', Number(e.target.value))}
+            onChange={(e) => handleChange('salePrice', e.target.value === '' ? '' : Number(e.target.value))}
             required
           />
           <Input
@@ -222,18 +341,18 @@ export function ProductFormModal({
             min="0"
             step="10"
             value={formData.wholesalePrice}
-            onChange={(e) => handleChange('wholesalePrice', Number(e.target.value))}
+            onChange={(e) => handleChange('wholesalePrice', e.target.value === '' ? '' : Number(e.target.value))}
           />
           <Input
             label="Stock Mínimo Alerta"
             type="number"
             min="0"
             value={formData.stockMin}
-            onChange={(e) => handleChange('stockMin', Number(e.target.value))}
+            onChange={(e) => handleChange('stockMin', e.target.value === '' ? '' : Number(e.target.value))}
           />
         </div>
 
-        {/* Fecha de Ingreso al Stock */}
+        {/* 5. Fecha de Ingreso al Stock */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Fecha de Ingreso al Stock"
@@ -242,15 +361,22 @@ export function ProductFormModal({
             onChange={(e) => handleChange('entryDate', e.target.value)}
           />
           <div className="flex items-center text-xs text-neutral-500 pt-5">
-            <span>Se utiliza para calcular la antigüedad en stock, prendas estancadas y sugerencias inteligentes de precios.</span>
+            <span>Se utiliza para calcular antigüedad en stock y sugerencias de precios.</span>
           </div>
         </div>
 
-        {/* Product Variant Manager (Sizes & Colors) */}
+        {/* 6. Product Variant Manager (Sizes & Colors) */}
         <ProductVariantManager
           variants={formData.variants}
           baseSku={formData.sku}
           onChange={(vars) => handleChange('variants', vars)}
+        />
+
+        {/* 7. Images (Optional for desktop) */}
+        <ImageUpload
+          images={formData.images}
+          onChange={(newImages) => handleChange('images', newImages)}
+          maxImages={5}
         />
 
         {/* Action Buttons */}
@@ -259,10 +385,11 @@ export function ProductFormModal({
             Cancelar
           </Button>
           <Button type="submit" variant="primary" size="sm" isLoading={loading}>
-            {initialProduct ? 'Guardar Cambios' : 'Crear Producto'}
+            {initialProduct ? 'Guardar Cambios' : 'Crear Prenda'}
           </Button>
         </div>
       </form>
     </Modal>
   );
 }
+

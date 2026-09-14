@@ -6,7 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { PAYMENT_METHODS, INCOME_CATEGORIES } from '../../constants/clothingConstants';
 import { formatCurrency } from '../../utils/formatters';
 import { Shirt, DollarSign, Plus, Trash2, ShoppingBag, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import { toastAlert, toast } from '../../components/ui/Toast';
 
 export function RegistrarIngresoModal({
   isOpen,
@@ -61,19 +61,19 @@ export function RegistrarIngresoModal({
 
   const handleAddToCart = () => {
     if (!selectedProduct) {
-      toast.error('Selecciona una prenda');
+      toastAlert.warning('Selecciona una prenda', 'Elige una prenda del catálogo para continuar.');
       return;
     }
 
     const qty = Number(quantity);
     if (!qty || qty <= 0) {
-      toast.error('Ingresa una cantidad válida mayor a 0');
+      toastAlert.error('Cantidad no válida', 'Ingresa una cantidad mayor a 0 unidades.');
       return;
     }
 
     const price = Number(unitPrice);
     if (price < 0 || isNaN(price)) {
-      toast.error('Ingresa un precio válido');
+      toastAlert.error('Precio no válido', 'Ingresa un precio de venta numérico.');
       return;
     }
 
@@ -85,7 +85,10 @@ export function RegistrarIngresoModal({
         .reduce((sum, i) => sum + i.quantity, 0);
 
       if (qty + alreadyInCart > availableStock) {
-        toast.error(`Stock insuficiente para talle/color seleccionado (disponible: ${availableStock})`);
+        toastAlert.error(
+          'Stock insuficiente',
+          `Disponible para este talle/color: ${availableStock} unidades.`
+        );
         return;
       }
     } else {
@@ -95,7 +98,7 @@ export function RegistrarIngresoModal({
         .reduce((sum, i) => sum + i.quantity, 0);
 
       if (qty + alreadyInCart > availableStock) {
-        toast.error(`Stock insuficiente (disponible: ${availableStock})`);
+        toastAlert.error('Stock insuficiente', `Stock total disponible: ${availableStock} unidades.`);
         return;
       }
     }
@@ -114,11 +117,18 @@ export function RegistrarIngresoModal({
 
     setCartItems((prev) => [...prev, newItem]);
     setQuantity(1);
-    toast.success(`${selectedProduct.name} agregada a la venta`);
+    toastAlert.success(
+      `${selectedProduct.name} agregada`,
+      `Talle: ${selectedVariant?.size || 'Único'} | Color: ${selectedVariant?.color || 'Único'} | Cantidad: ${qty}`
+    );
   };
 
   const handleRemoveFromCart = (index) => {
+    const item = cartItems[index];
     setCartItems((prev) => prev.filter((_, i) => i !== index));
+    if (item) {
+      toastAlert.info('Prenda removida', `Se quitó ${item.productName} del cobro.`);
+    }
   };
 
   const totalSaleAmount = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -127,7 +137,10 @@ export function RegistrarIngresoModal({
   const handleSubmitSale = async (e) => {
     e.preventDefault();
     if (cartItems.length === 0) {
-      toast.error('Agrega al menos una prenda a la venta');
+      toastAlert.warning(
+        'Venta sin prendas',
+        'Agrega al menos una prenda al detalle antes de confirmar el cobro.'
+      );
       return;
     }
 
@@ -162,7 +175,7 @@ export function RegistrarIngresoModal({
     e.preventDefault();
     const amount = Number(directAmount);
     if (!amount || amount <= 0) {
-      toast.error('Ingresa un monto válido mayor a 0');
+      toastAlert.error('Monto requerido', 'Ingresa un importe válido mayor a $ 0.');
       return;
     }
 
@@ -241,7 +254,7 @@ export function RegistrarIngresoModal({
                   <option key="default-product" value="">Seleccionar del catálogo...</option>
                   {products.map((p, idx) => (
                     <option key={p.id || `prod-${idx}`} value={p.id || ''}>
-                      {p.name} (Stock total: {p.stock || 0})
+                      {p.name} {p.location ? `[${p.location}]` : ''} - {formatCurrency(p.salePrice)} (Stock: {p.stock || 0})
                     </option>
                   ))}
                 </Select>
@@ -269,6 +282,33 @@ export function RegistrarIngresoModal({
                   </div>
                 )}
               </div>
+
+              {/* Ficha descriptiva para reconocimiento en el mostrador */}
+              {selectedProduct && (
+                <div className="flex items-center gap-2 flex-wrap text-xs text-neutral-600 bg-white px-3 py-2 rounded-xl border border-neutral-200">
+                  <span className="font-bold text-neutral-800 text-[11px] uppercase tracking-wider">Identificación:</span>
+                  {selectedProduct.location && (
+                    <span className="bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded font-bold text-[11px]">
+                      📍 Ubicación: {selectedProduct.location}
+                    </span>
+                  )}
+                  {selectedProduct.fabric && (
+                    <span className="text-neutral-700 font-medium">
+                      🧵 Tela: {selectedProduct.fabric}
+                    </span>
+                  )}
+                  {selectedProduct.cutStyle && (
+                    <span className="text-neutral-600">
+                      ✂️ Corte: {selectedProduct.cutStyle}
+                    </span>
+                  )}
+                  {selectedProduct.distinctiveDetails && (
+                    <span className="text-neutral-500 italic">
+                      "{selectedProduct.distinctiveDetails}"
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
                 <Input

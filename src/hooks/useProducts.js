@@ -10,7 +10,8 @@ import {
   clearAllProducts,
 } from '../services/firebase/firestore';
 import { calculateTotalStock } from '../utils/calculations';
-import { toast } from 'sonner';
+import { formatCurrency } from '../utils/formatters';
+import { toastAlert, toast } from '../components/ui/Toast';
 
 export function useProducts() {
   const [products, setProducts] = useState(() => getCachedCollection(COLLECTIONS.PRODUCTS) || []);
@@ -155,10 +156,10 @@ export function useProducts() {
         saveStoredCollection(COLLECTIONS.COST_HISTORY, [costHistory[0], ...currentCosts]);
       }
 
-      toast.success('Producto creado exitosamente');
+      toastAlert.success('Prenda registrada', `${productData.name} fue guardada en el catálogo.`);
       return res;
     } catch (error) {
-      toast.error('Error al crear producto');
+      toastAlert.error('Error al crear prenda', error.message || 'Intente nuevamente');
       throw error;
     }
   }, []);
@@ -221,9 +222,9 @@ export function useProducts() {
       };
 
       await updateDocument(COLLECTIONS.PRODUCTS, id, updatePayload);
-      toast.success('Producto actualizado');
+      toastAlert.success('Prenda actualizada', `Los cambios en "${productData.name}" se guardaron.`);
     } catch (error) {
-      toast.error('Error al actualizar producto');
+      toastAlert.error('Error al actualizar', error.message || 'No se pudieron guardar los cambios');
       throw error;
     }
   }, [products]);
@@ -261,11 +262,14 @@ export function useProducts() {
       const currentPrices = getCachedCollection(COLLECTIONS.PRICE_HISTORY) || [];
       saveStoredCollection(COLLECTIONS.PRICE_HISTORY, [priceEntry, ...currentPrices]);
 
-      toast.success('Precio actualizado correctamente.');
+      toastAlert.success(
+        'Precio actualizado',
+        `${product.name}: nuevo precio ${formatCurrency(numericNewPrice)}.`
+      );
       return true;
     } catch (error) {
       console.error(error);
-      toast.error('Error al actualizar precio');
+      toastAlert.error('Error al actualizar precio', error.message);
       throw error;
     }
   }, [products]);
@@ -308,11 +312,14 @@ export function useProducts() {
         saveStoredCollection(COLLECTIONS.PRICE_HISTORY, [priceEntry, ...currentPrices]);
       }
 
-      toast.success(`${updates.length} precios actualizados correctamente.`);
+      toastAlert.success(
+        'Actualización masiva completada',
+        `Se actualizaron los precios de ${updates.length} prendas.`
+      );
       return true;
     } catch (error) {
       console.error(error);
-      toast.error('Error en la actualización masiva de precios');
+      toastAlert.error('Error masivo de precios', error.message || 'No se pudieron actualizar los precios');
       throw error;
     }
   }, [products]);
@@ -358,9 +365,9 @@ export function useProducts() {
   const removeProduct = useCallback(async (id) => {
     try {
       await deleteDocument(COLLECTIONS.PRODUCTS, id);
-      toast.success('Producto eliminado');
+      toastAlert.info('Prenda eliminada', 'La prenda fue dada de baja del catálogo.');
     } catch (error) {
-      toast.error('Error al eliminar producto');
+      toastAlert.error('Error al eliminar prenda', error.message);
       throw error;
     }
   }, []);
@@ -392,15 +399,15 @@ export function useProducts() {
       date: new Date().toISOString(),
     });
 
-    toast.success('Stock actualizado');
+    toastAlert.success('Stock actualizado', `${product.name}: stock ajustado.`);
   }, [products]);
 
   const clearProducts = useCallback(async () => {
     try {
       await clearAllProducts();
-      toast.success('Catálogo de prendas vaciado correctamente');
+      toastAlert.info('Catálogo vaciado', 'Se eliminaron todas las prendas del catálogo.');
     } catch (error) {
-      toast.error('Error al vaciar catálogo');
+      toastAlert.error('Error al vaciar catálogo', error.message);
       throw error;
     }
   }, []);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Bookmark, Search } from 'lucide-react';
 import { useBrands } from '../../hooks/useCatalog';
+import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
@@ -8,6 +9,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 
 export function MarcasPage() {
+  const { can } = useAuth();
   const { brands, loading, createBrand, editBrand, removeBrand } = useBrands();
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -60,9 +62,11 @@ export function MarcasPage() {
             Gestión de marcas y fabricantes de indumentaria
           </p>
         </div>
-        <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
-          Nueva Marca
-        </Button>
+        {can('brands.create') && (
+          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+            Nueva Marca
+          </Button>
+        )}
       </div>
 
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 p-4 shadow-xs">
@@ -87,7 +91,9 @@ export function MarcasPage() {
                   <th className="p-3">Marca</th>
                   <th className="p-3">Origen</th>
                   <th className="p-3">Descripción</th>
-                  <th className="p-3 text-right">Acciones</th>
+                  {(can('brands.edit') || can('brands.delete')) && (
+                    <th className="p-3 text-right">Acciones</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
@@ -101,24 +107,30 @@ export function MarcasPage() {
                       {brand.origin || 'Nacional'}
                     </td>
                     <td className="p-3 text-neutral-600 font-medium">{brand.description || '-'}</td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleOpenEdit(brand)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(brand.id)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {(can('brands.edit') || can('brands.delete')) && (
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {can('brands.edit') && (
+                            <button
+                              onClick={() => handleOpenEdit(brand)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {can('brands.delete') && (
+                            <button
+                              onClick={() => setDeletingId(brand.id)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {filtered.length === 0 && (

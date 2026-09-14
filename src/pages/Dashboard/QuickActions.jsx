@@ -1,27 +1,33 @@
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Boxes, CircleDollarSign, ArrowDownLeft, BarChart3 } from 'lucide-react';
+import { Boxes, CircleDollarSign, ArrowDownLeft, BarChart3, Users, Shirt } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { useAuth } from '../../context/AuthContext';
 
 export function QuickActions() {
   const navigate = useNavigate();
+  const { can } = useAuth();
 
-  const actions = [
-    { label: 'Caja y Finanzas', icon: CircleDollarSign, variant: 'primary', onClick: () => navigate('/caja') },
-    { label: 'Ajustar Stock', icon: Boxes, variant: 'outline', onClick: () => navigate('/stock') },
-    { label: 'Nueva Prenda', icon: PlusCircle, variant: 'outline', onClick: () => navigate('/productos') },
-    { label: 'Compras de Stock', icon: ArrowDownLeft, variant: 'outline', onClick: () => navigate('/compras') },
-    { label: 'Reportes', icon: BarChart3, variant: 'outline', onClick: () => navigate('/reportes') },
+  const allActions = [
+    { label: 'Caja del Turno', icon: CircleDollarSign, variant: 'primary', onClick: () => navigate('/caja'), permission: 'cash.view' },
+    { label: 'Consultar Stock', icon: Boxes, variant: 'outline', onClick: () => navigate('/stock'), permission: 'stock.view' },
+    { label: 'Catálogo Prendas', icon: Shirt, variant: 'outline', onClick: () => navigate('/productos'), permission: 'products.view' },
+    { label: 'Clientes', icon: Users, variant: 'outline', onClick: () => navigate('/clientes'), permission: 'clients.manage' },
+    { label: 'Compras Proveedor', icon: ArrowDownLeft, variant: 'outline', onClick: () => navigate('/compras'), permission: 'purchases.view' },
+    { label: 'Reportes y Balances', icon: BarChart3, variant: 'outline', onClick: () => navigate('/reportes'), permission: 'reports.view' },
   ];
 
+  const visibleActions = allActions.filter((act) => !act.permission || can(act.permission));
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {actions.map((act, i) => (
+    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
+      {visibleActions.map((act, i) => (
         <Button
           key={i}
           variant={act.variant}
           size="sm"
           leftIcon={act.icon}
           onClick={act.onClick}
+          className="w-full sm:w-auto justify-center text-xs h-9.5 font-bold"
         >
           {act.label}
         </Button>

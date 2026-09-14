@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Skeleton } from '../components/ui/Skeleton';
 
 export function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }) {
     );
   }
 
-  if (!user) {
+  if (!user || isAuthenticated === false || user.active === false) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

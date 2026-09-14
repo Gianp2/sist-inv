@@ -53,16 +53,27 @@ export function ImageUpload({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
-          Fotografías del Producto ({images.length}/{maxImages})
-        </label>
-        <span className="text-[11px] text-neutral-500">PNG, JPG, WEBP (Cloudinary)</span>
+    <div className="space-y-3 p-3.5 rounded-2xl bg-neutral-50/70 border border-neutral-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+        <div className="flex items-center gap-2">
+          <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">
+            Fotografías de la Prenda
+          </label>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-200 text-neutral-700">
+            Opcional ({images.length}/{maxImages})
+          </span>
+        </div>
+        <span className="text-[11px] text-neutral-500">
+          JPG, PNG o WebP
+        </span>
       </div>
 
+      <p className="text-[11px] text-neutral-500 leading-relaxed">
+        En computadoras de mostrador no es necesario subir fotos. Si no tienes imágenes, la prenda se identificará automáticamente en todo el sistema por su ficha técnica, tela, color y ubicación en percheros.
+      </p>
+
       {/* Grid of uploaded images */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 pt-1">
         {images.map((imgUrl, index) => (
           <div
             key={index}

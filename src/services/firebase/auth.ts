@@ -11,7 +11,7 @@ import {
 import { auth } from './config';
 import { COLLECTIONS } from '../../constants/collections';
 import { ROLES } from '../../constants/roles';
-import { getDocument, setDocument, updateDocument, getCollection } from './firestore';
+import { getDocument, setDocument, updateDocument, getCollection, clearAllFirestoreSubscriptions } from './firestore';
 
 const SESSION_STORAGE_KEY = 'sistemainv_auth_session';
 
@@ -29,12 +29,12 @@ export interface UserSession {
   [key: string]: any;
 }
 
-// Pre-seeded Admin Session (always available immediately for offline or fallback)
+// Pre-seeded Admin Session reference (for credentials verification)
 export const DEFAULT_ADMIN_SESSION: UserSession = {
   uid: 'zvKPMDfIe0ZfwdikFBmhYCyq7w42',
   id: 'zvKPMDfIe0ZfwdikFBmhYCyq7w42',
   email: 'admin@sistema.com',
-  displayName: 'Administrador',
+  displayName: 'Dueña / Administradora',
   role: ROLES.ADMIN,
   active: true,
   createdAt: '2025-01-01T00:00:00.000Z',
@@ -55,25 +55,28 @@ const notifySubscribers = (user: UserSession | null): void => {
 
 export const getStoredSession = (): UserSession | null => {
   try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.uid || parsed.id) && parsed.email) {
         return parsed;
       }
     }
-    return DEFAULT_ADMIN_SESSION;
+    return null;
   } catch (e) {
-    return DEFAULT_ADMIN_SESSION;
+    return null;
   }
 };
 
 export const setStoredSession = (user: UserSession | null): void => {
   try {
     if (user) {
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
     } else {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch (_) {}
     }
     notifySubscribers(user);
   } catch (e) {
@@ -162,7 +165,7 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
         uid: 'zvKPMDfIe0ZfwdikFBmhYCyq7w42',
         id: 'zvKPMDfIe0ZfwdikFBmhYCyq7w42',
         email: 'admin@sistema.com',
-        displayName: 'Administrador',
+        displayName: 'Dueña / Administradora',
         role: ROLES.ADMIN,
         active: true,
         createdAt: '2025-01-01T00:00:00.000Z',
@@ -179,7 +182,7 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
         uid: 'Y6zcr0uVafRbKFDkNG9RSOJeV9f1',
         id: 'Y6zcr0uVafRbKFDkNG9RSOJeV9f1',
         email: 'vendedor@sistema.com',
-        displayName: 'Vendedor Mostrador',
+        displayName: 'Vendedora Mostrador',
         role: ROLES.EMPLEADO,
         active: true,
         createdAt: '2025-01-01T00:00:00.000Z',
@@ -365,6 +368,7 @@ export const transferAdminPrivilege = async (
  */
 export const logoutUser = async (): Promise<void> => {
   try {
+    clearAllFirestoreSubscriptions();
     await signOut(auth);
   } catch (error) {
     console.warn('Sign out warning:', error);
@@ -406,7 +410,6 @@ export const subscribeToAuth = (callback: (user: UserSession | null) => void): (
         try {
           const userDoc = await getDocument<UserSession>(COLLECTIONS.USERS, firebaseUser.uid);
           const isRealAdmin = firebaseUser.uid === 'zvKPMDfIe0ZfwdikFBmhYCyq7w42' || firebaseUser.email === 'admin@sistema.com';
-          const isRealVendedor = firebaseUser.uid === 'Y6zcr0uVafRbKFDkNG9RSOJeV9f1' || firebaseUser.email === 'vendedor@sistema.com';
           const assignedRole = userDoc?.role || (isRealAdmin ? ROLES.ADMIN : ROLES.EMPLEADO);
 
           if (userDoc && userDoc.active === false) {
@@ -415,6 +418,7 @@ export const subscribeToAuth = (callback: (user: UserSession | null) => void): (
           }
 
           const fullUser: UserSession = {
+            ...userDoc,
             uid: firebaseUser.uid,
             id: firebaseUser.uid,
             email: firebaseUser.email || '',
@@ -422,6 +426,7 @@ export const subscribeToAuth = (callback: (user: UserSession | null) => void): (
             role: assignedRole,
             active: userDoc ? userDoc.active !== false : true,
             photoURL: firebaseUser.photoURL || '',
+            permissions: userDoc?.permissions || undefined,
           };
 
           setStoredSession(fullUser);
@@ -437,6 +442,8 @@ export const subscribeToAuth = (callback: (user: UserSession | null) => void): (
           };
           setStoredSession(fallbackUser);
         }
+      } else {
+        setStoredSession(null);
       }
     });
   } catch (e) {
@@ -452,3 +459,15 @@ export const subscribeToAuth = (callback: (user: UserSession | null) => void): (
     }
   };
 };
+
+/**
+ * Quick toggle between Owner (Admin) and Employee (Vendedor) credentials
+ */
+export const quickSwitchRole = async (targetRole: Role | string): Promise<UserSession> => {
+  if (targetRole === ROLES.ADMIN) {
+    return loginWithEmail('admin@sistema.com', 'sistema2002');
+  } else {
+    return loginWithEmail('vendedor@sistema.com', 'vendedor2026');
+  }
+};
+

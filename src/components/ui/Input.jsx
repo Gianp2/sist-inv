@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
+import { sanitizeNumericValue, handleNumericFocus } from '../../utils/numericUtils';
 
 export const Input = React.forwardRef(
   (
@@ -11,11 +12,57 @@ export const Input = React.forwardRef(
       rightIcon: RightIcon,
       className = '',
       id,
+      type,
+      value,
+      onChange,
+      onInput,
+      onFocus,
       ...props
     },
     ref
   ) => {
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const isNumeric = type === 'number';
+
+    const handleFocusInternal = (e) => {
+      if (isNumeric) {
+        handleNumericFocus(e);
+      }
+      if (onFocus) {
+        onFocus(e);
+      }
+    };
+
+    const handleChangeInternal = (e) => {
+      if (isNumeric) {
+        const raw = e.target.value;
+        const sanitized = sanitizeNumericValue(raw);
+        if (raw !== sanitized) {
+          e.target.value = sanitized;
+        }
+      }
+      if (onChange) {
+        onChange(e);
+      }
+    };
+
+    const handleInputInternal = (e) => {
+      if (isNumeric) {
+        const raw = e.target.value;
+        const sanitized = sanitizeNumericValue(raw);
+        if (raw !== sanitized) {
+          e.target.value = sanitized;
+        }
+      }
+      if (onInput) {
+        onInput(e);
+      }
+    };
+
+    // Si es numérico y se pasa un string con ceros sobrantes, formatearlo
+    const displayValue = isNumeric && typeof value === 'string'
+      ? sanitizeNumericValue(value)
+      : value;
 
     return (
       <div className="w-full space-y-1.5">
@@ -36,6 +83,11 @@ export const Input = React.forwardRef(
           <input
             id={inputId}
             ref={ref}
+            type={type}
+            value={displayValue}
+            onChange={handleChangeInternal}
+            onInput={handleInputInternal}
+            onFocus={handleFocusInternal}
             className={cn(
               'w-full rounded-xl border bg-white px-3.5 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 transition-all duration-150',
               'focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent',

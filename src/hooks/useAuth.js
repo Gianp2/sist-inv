@@ -27,6 +27,7 @@ export function useAuth() {
     logout,
     resetPassword,
     refreshUser,
+    switchAccount,
     activeAdminUser,
   } = context;
 
@@ -54,19 +55,21 @@ export function useAuth() {
     const can = (permission) => {
       if (!isAuthenticated) return false;
       if (isUniqueAdmin || isAdmin) return true;
-      return hasPermission(role, permission);
+      return hasPermission(role, permission, user?.permissions);
     };
 
     const canAny = (permissions = []) => {
       if (!isAuthenticated) return false;
       if (isUniqueAdmin || isAdmin) return true;
-      return permissions.some((perm) => hasPermission(role, perm));
+      if (!Array.isArray(permissions)) return false;
+      return permissions.some((perm) => can(perm));
     };
 
     const canAll = (permissions = []) => {
       if (!isAuthenticated) return false;
       if (isUniqueAdmin || isAdmin) return true;
-      return permissions.every((perm) => hasPermission(role, perm));
+      if (!Array.isArray(permissions)) return false;
+      return permissions.every((perm) => can(perm));
     };
 
     const hasRole = (...allowedRoles) => {
@@ -107,6 +110,7 @@ export function useAuth() {
     logout,
     resetPassword,
     refreshUser,
+    switchAccount,
     ...authDetails,
   };
 }

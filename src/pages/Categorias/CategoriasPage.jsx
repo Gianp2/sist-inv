@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Tags, Search } from 'lucide-react';
 import { useCategories } from '../../hooks/useCatalog';
+import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
@@ -8,6 +9,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 
 export function CategoriasPage() {
+  const { can } = useAuth();
   const { categories, loading, createCategory, editCategory, removeCategory } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -60,9 +62,11 @@ export function CategoriasPage() {
             Clasificación de productos (Remeras, Pantalones, Camperas, etc.)
           </p>
         </div>
-        <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
-          Nueva Categoría
-        </Button>
+        {can('categories.create') && (
+          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+            Nueva Categoría
+          </Button>
+        )}
       </div>
 
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 p-4 shadow-xs">
@@ -87,7 +91,9 @@ export function CategoriasPage() {
                   <th className="p-3">Nombre</th>
                   <th className="p-3">Código</th>
                   <th className="p-3">Descripción</th>
-                  <th className="p-3 text-right">Acciones</th>
+                  {(can('categories.edit') || can('categories.delete')) && (
+                    <th className="p-3 text-right">Acciones</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
@@ -101,24 +107,30 @@ export function CategoriasPage() {
                       {cat.code || '-'}
                     </td>
                     <td className="p-3 text-neutral-600 font-medium">{cat.description || '-'}</td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleOpenEdit(cat)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(cat.id)}
-                          className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {(can('categories.edit') || can('categories.delete')) && (
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {can('categories.edit') && (
+                            <button
+                              onClick={() => handleOpenEdit(cat)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {can('categories.delete') && (
+                            <button
+                              onClick={() => setDeletingId(cat.id)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {filtered.length === 0 && (

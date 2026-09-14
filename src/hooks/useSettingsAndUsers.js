@@ -110,6 +110,27 @@ export function useUsers() {
     }
   }, [users]);
 
+  // Update individual employee permissions
+  const updateUserPermissions = useCallback(async (userId, permissions) => {
+    try {
+      const targetUser = users.find((u) => (u.id || u.uid) === userId);
+      if (targetUser?.role === ROLES.ADMIN) {
+        toast.info('El Administrador posee acceso total irrestricto por definición.');
+        return;
+      }
+
+      await updateDocument(COLLECTIONS.USERS, userId, {
+        permissions,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success('Permisos actualizados con éxito');
+    } catch (error) {
+      console.error('Error updating user permissions:', error);
+      toast.error(error.message || 'Error al actualizar permisos del usuario');
+      throw error;
+    }
+  }, [users]);
+
   return {
     users,
     loading,
@@ -117,6 +138,7 @@ export function useUsers() {
     hasAdmin,
     changeUserRole,
     toggleUserStatus,
+    updateUserPermissions,
     removeUser,
   };
 }

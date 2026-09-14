@@ -232,6 +232,29 @@ export const getDocument = async <T = any>(
 };
 
 /**
+ * Recursively sanitizes objects for Firestore by converting undefined to null,
+ * handling Dates, and removing unallowed types.
+ */
+export const sanitizeForFirestore = (val: any): any => {
+  if (val === undefined) return null;
+  if (val === null) return null;
+  if (typeof val !== 'object') return val;
+  if (val instanceof Date) return val.toISOString();
+  if (Array.isArray(val)) {
+    return val.map(sanitizeForFirestore);
+  }
+  const result: Record<string, any> = {};
+  for (const [k, v] of Object.entries(val)) {
+    if (v === undefined) {
+      result[k] = null;
+    } else {
+      result[k] = sanitizeForFirestore(v);
+    }
+  }
+  return result;
+};
+
+/**
  * Add a new document with auto-generated ID & optimistic instant cache update
  */
 export const addDocument = async <T = any>(collectionName: string, data: any): Promise<T> => {
@@ -239,9 +262,10 @@ export const addDocument = async <T = any>(collectionName: string, data: any): P
 
   const newId = 'doc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
   const nowIso = new Date().toISOString();
+  const cleanData = sanitizeForFirestore(data);
   const newItem = {
     id: newId,
-    ...data,
+    ...cleanData,
     createdAt: nowIso,
     updatedAt: nowIso,
   };
@@ -253,7 +277,7 @@ export const addDocument = async <T = any>(collectionName: string, data: any): P
   try {
     const colRef = collection(db, collectionName);
     const docData = {
-      ...data,
+      ...cleanData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -267,7 +291,12 @@ export const addDocument = async <T = any>(collectionName: string, data: any): P
 
     return finalItem as T;
   } catch (error) {
-    return newItem as T;
+    // Revert optimistic update to prevent ghost items
+    const current = collectionCache.get(collectionName) || [];
+    const reverted = current.filter((item: any) => item.id !== newId);
+    notifySubscribers(collectionName, reverted);
+    console.error(`[Firestore addDocument Error in "${collectionName}"]:`, error);
+    throw error;
   }
 };
 
@@ -283,15 +312,17 @@ export const setDocument = async <T = any>(
   initWarmCache(collectionName);
 
   const nowIso = new Date().toISOString();
+  const cleanData = sanitizeForFirestore(data);
   const optimisticItem = {
     id: docId,
-    ...data,
+    ...cleanData,
     updatedAt: nowIso,
   };
 
   // Optimistic update
   const existing = collectionCache.get(collectionName) || [];
   const exists = existing.some((item: any) => item.id === docId);
+  const previousItem = existing.find((item: any) => item.id === docId);
   const updatedList = exists
     ? existing.map((item: any) => (item.id === docId ? { ...item, ...optimisticItem } : item))
     : [optimisticItem, ...existing];
@@ -300,13 +331,20 @@ export const setDocument = async <T = any>(
   try {
     const docRef = doc(db, collectionName, docId);
     const docData = {
-      ...data,
+      ...cleanData,
       updatedAt: serverTimestamp(),
     };
     await setDoc(docRef, docData, { merge });
     return { id: docId, ...docData } as T;
   } catch (error) {
-    return optimisticItem as T;
+    // Revert optimistic update on failure
+    const current = collectionCache.get(collectionName) || [];
+    const reverted = exists
+      ? current.map((item: any) => (item.id === docId ? previousItem : item))
+      : current.filter((item: any) => item.id !== docId);
+    notifySubscribers(collectionName, reverted);
+    console.error(`[Firestore setDocument Error in "${collectionName}/${docId}"]:`, error);
+    throw error;
   }
 };
 
@@ -320,22 +358,31 @@ export const updateDocument = async <T = any>(
 ): Promise<T> => {
   initWarmCache(collectionName);
 
+  const cleanData = sanitizeForFirestore(data);
   const existing = collectionCache.get(collectionName) || [];
+  const previousItem = existing.find((item: any) => item.id === docId);
   const updatedList = existing.map((item: any) =>
-    item.id === docId ? { ...item, ...data, updatedAt: new Date().toISOString() } : item
+    item.id === docId ? { ...item, ...cleanData, updatedAt: new Date().toISOString() } : item
   );
   notifySubscribers(collectionName, updatedList);
 
   try {
     const docRef = doc(db, collectionName, docId);
     const updateData = {
-      ...data,
+      ...cleanData,
       updatedAt: serverTimestamp(),
     };
     await updateDoc(docRef, updateData);
     return { id: docId, ...updateData } as T;
   } catch (error) {
-    return { id: docId, ...data } as T;
+    // Revert optimistic update on failure
+    if (previousItem) {
+      const current = collectionCache.get(collectionName) || [];
+      const reverted = current.map((item: any) => (item.id === docId ? previousItem : item));
+      notifySubscribers(collectionName, reverted);
+    }
+    console.error(`[Firestore updateDocument Error in "${collectionName}/${docId}"]:`, error);
+    throw error;
   }
 };
 
@@ -346,6 +393,7 @@ export const deleteDocument = async (collectionName: string, docId: string): Pro
   initWarmCache(collectionName);
 
   const existing = collectionCache.get(collectionName) || [];
+  const previousItem = existing.find((item: any) => item.id === docId);
   const updatedList = existing.filter((item: any) => item.id !== docId);
   notifySubscribers(collectionName, updatedList);
 
@@ -354,7 +402,13 @@ export const deleteDocument = async (collectionName: string, docId: string): Pro
     await deleteDoc(docRef);
     return docId;
   } catch (error) {
-    return docId;
+    // Revert optimistic removal on failure
+    if (previousItem) {
+      const current = collectionCache.get(collectionName) || [];
+      notifySubscribers(collectionName, [previousItem, ...current]);
+    }
+    console.error(`[Firestore deleteDocument Error in "${collectionName}/${docId}"]:`, error);
+    throw error;
   }
 };
 
@@ -470,6 +524,22 @@ export const subscribeCollection = <T = any>(
   } catch (error) {
     return () => {};
   }
+};
+
+/**
+ * Unsubscribes and cleans up all active Firestore subscriptions (e.g. on user logout)
+ */
+export const clearAllFirestoreSubscriptions = (): void => {
+  multiplexedSubscriptions.forEach((entry) => {
+    try {
+      if (entry.cleanupTimer) {
+        clearTimeout(entry.cleanupTimer);
+        entry.cleanupTimer = null;
+      }
+      entry.unsubscribe();
+    } catch (_) {}
+  });
+  multiplexedSubscriptions.clear();
 };
 
 /**

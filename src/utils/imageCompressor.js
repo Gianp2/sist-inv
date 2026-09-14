@@ -4,7 +4,7 @@
  * Reduces 5MB-10MB camera photos to ~100KB without perceptible quality loss.
  */
 
-export async function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+export async function compressImage(file, maxWidth = 720, maxHeight = 720, quality = 0.7) {
   // If it's not an image file (or is an SVG), return as is
   if (!file || typeof file === 'string' || !file.type || !file.type.startsWith('image/')) {
     return file;
@@ -53,7 +53,7 @@ export async function compressImage(file, maxWidth = 1200, maxHeight = 1200, qua
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Prefer modern webp, fallback to jpeg
+        // Prefer standard jpeg for small payload
         const outputType = 'image/jpeg';
         canvas.toBlob(
           (blob) => {
@@ -81,5 +81,58 @@ export async function compressImage(file, maxWidth = 1200, maxHeight = 1200, qua
     reader.onerror = () => {
       resolve(file);
     };
+  });
+}
+
+/**
+ * Compresses a base64 Data URL string to a lightweight base64 thumbnail (<50KB)
+ */
+export async function compressBase64(base64Str, maxWidth = 640, maxHeight = 640, quality = 0.65) {
+  if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image')) {
+    return base64Str;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, width, height);
+
+      try {
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      } catch (e) {
+        resolve(base64Str);
+      }
+    };
+
+    img.onerror = () => resolve(base64Str);
   });
 }

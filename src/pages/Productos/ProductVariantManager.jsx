@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2, Palette, Layers } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { CLOTHING_SIZES, CLOTHING_COLORS } from '../../constants/clothingConstants';
+import { sanitizeNumericValue, handleNumericFocus } from '../../utils/numericUtils';
 
 export function ProductVariantManager({ variants = [], onChange, baseSku = '' }) {
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -54,9 +55,10 @@ export function ProductVariantManager({ variants = [], onChange, baseSku = '' })
     setSelectedColors([]);
   };
 
-  const handleStockChange = (index, newStock) => {
+  const handleStockChange = (index, rawStock) => {
+    const sanitized = sanitizeNumericValue(rawStock);
     const updated = [...variants];
-    updated[index].stock = Math.max(0, parseInt(newStock) || 0);
+    updated[index].stock = sanitized === '' ? '' : Math.max(0, parseInt(sanitized, 10) || 0);
     onChange(updated);
   };
 
@@ -214,6 +216,10 @@ export function ProductVariantManager({ variants = [], onChange, baseSku = '' })
                     type="number"
                     min="0"
                     value={variant.stock}
+                    onFocus={handleNumericFocus}
+                    onBlur={() => {
+                      if (variant.stock === '') handleStockChange(idx, 0);
+                    }}
                     onChange={(e) => handleStockChange(idx, e.target.value)}
                     className="w-16 h-8 text-center text-xs font-bold rounded-lg border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 hover:border-neutral-400"
                   />

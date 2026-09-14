@@ -153,16 +153,13 @@ export function BatchPriceUpdateModal({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-neutral-700 block mb-1">
-              {operationType === 'FIXED_PRICE' ? 'Precio Nuevo ($) *' : 'Porcentaje (%) *'}
-            </label>
-            <input
+            <Input
+              label={operationType === 'FIXED_PRICE' ? 'Precio Nuevo ($) *' : 'Porcentaje (%) *'}
               type="number"
               min="0"
               step={operationType === 'FIXED_PRICE' ? '100' : '1'}
               value={value}
-              onChange={(e) => setValue(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-white border border-neutral-300 text-neutral-800 focus:outline-hidden focus:ring-2 focus:ring-neutral-900"
+              onChange={(e) => setValue(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </div>
 

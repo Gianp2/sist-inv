@@ -259,7 +259,7 @@ export function Caja() {
   };
 
   // --- Calculations for Current Shift ---
-  const activeMovements = isCashOpen ? shiftMovements : (allMovements.slice(0, 50));
+  const activeMovements = isCashOpen ? (shiftMovements || []) : ((allMovements || []).slice(0, 50));
 
   const shiftIncomes = useMemo(() => {
     return (isCashOpen ? shiftMovements : []).filter(

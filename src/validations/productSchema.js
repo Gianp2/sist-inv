@@ -24,6 +24,11 @@ export const productSchema = z.object({
   discount: z.number().min(0).max(100).default(0),
   stockMin: z.number().min(0, 'El stock mínimo no puede ser negativo').default(5),
   images: z.array(z.string()).default([]),
+  fabric: z.string().optional(),
+  location: z.string().optional(),
+  season: z.string().optional(),
+  cutStyle: z.string().optional(),
+  distinctiveDetails: z.string().optional(),
   variants: z.array(productVariantSchema).default([]),
   active: z.boolean().default(true),
 });

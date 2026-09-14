@@ -62,7 +62,8 @@ export function ReportesPage() {
   const { allMovements, loading: cashLoading } = useCashRegister();
   const { products, loading: productsLoading } = useProducts();
   const { settings } = useSettings();
-  const { user } = useAuth();
+  const { user, can, isAdmin } = useAuth();
+  const canExport = isAdmin || can('reports.export');
 
   // Active Month & Year selector for Monthly Reports
   const currentDate = new Date();
@@ -300,9 +301,9 @@ export function ReportesPage() {
   return (
     <div className="space-y-6">
       {/* Header & Period Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-center md:text-left">
         <div>
-          <h1 className="text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-2xl font-black text-neutral-900 tracking-tight flex items-center justify-center md:justify-start gap-2.5">
             <FileText className="w-7 h-7 text-neutral-900" />
             Reportes Mensuales en PDF y Análisis
           </h1>
@@ -312,7 +313,7 @@ export function ReportesPage() {
         </div>
 
         {/* Month & Year Selectors Bar */}
-        <div className="card-panel flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white border border-neutral-200 shadow-xs">
+        <div className="card-panel flex flex-wrap items-center justify-center md:justify-end gap-2 p-1.5 rounded-2xl bg-white border border-neutral-200 shadow-xs w-full md:w-auto">
           <div className="flex items-center gap-1.5 px-2 text-xs font-bold text-neutral-600">
             <Calendar className="w-4 h-4 text-neutral-500" />
             <span>Período:</span>
@@ -345,14 +346,14 @@ export function ReportesPage() {
       </div>
 
       {/* PDF Generation Action Banner */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-neutral-900 text-white shadow-md relative overflow-hidden">
+      <div className="p-5 sm:p-6 rounded-2xl bg-neutral-900 text-white shadow-md relative overflow-hidden text-center sm:text-left">
         {/* Subtle background graphic */}
         <div className="absolute right-0 top-0 bottom-0 opacity-5 pointer-events-none flex items-center pr-6">
           <FileText className="w-64 h-64" />
         </div>
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="space-y-1.5 max-w-2xl">
+          <div className="space-y-1.5 max-w-2xl flex flex-col items-center sm:items-start">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-neutral-800 border border-neutral-700 text-[11px] font-bold text-neutral-300 tracking-wide">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               REPORTE EJECUTIVO MENSUAL
@@ -366,36 +367,42 @@ export function ReportesPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => handleGeneratePDF('FULL')}
-              disabled={isGeneratingPDF}
-              className="px-4 py-2.5 rounded-xl bg-white text-neutral-950 font-bold text-xs flex items-center gap-2 hover:bg-neutral-100 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-4 h-4 text-neutral-900" />
-              {isGeneratingPDF ? 'Generando PDF...' : 'Descargar Reporte PDF Completo'}
-            </button>
+          {canExport ? (
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start flex-wrap gap-2.5 w-full lg:w-auto">
+              <button
+                onClick={() => handleGeneratePDF('FULL')}
+                disabled={isGeneratingPDF}
+                className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-white text-neutral-950 font-bold text-xs flex items-center gap-2 hover:bg-neutral-100 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                <Download className="w-4 h-4 text-neutral-900" />
+                {isGeneratingPDF ? 'Generando PDF...' : 'Descargar Reporte PDF Completo'}
+              </button>
 
-            <button
-              onClick={() => handleGeneratePDF('CASH_ONLY')}
-              disabled={isGeneratingPDF}
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors border border-neutral-700 cursor-pointer disabled:opacity-50"
-              title="Descargar solo la sección de ingresos vs egresos de caja"
-            >
-              <FileText className="w-3.5 h-3.5 text-neutral-300" />
-              PDF Solo Caja
-            </button>
+              <button
+                onClick={() => handleGeneratePDF('CASH_ONLY')}
+                disabled={isGeneratingPDF}
+                className="w-full sm:w-auto justify-center px-3.5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors border border-neutral-700 cursor-pointer disabled:opacity-50"
+                title="Descargar solo la sección de ingresos vs egresos de caja"
+              >
+                <FileText className="w-3.5 h-3.5 text-neutral-300" />
+                PDF Solo Caja
+              </button>
 
-            <button
-              onClick={() => handleGeneratePDF('STOCK_ONLY')}
-              disabled={isGeneratingPDF}
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors border border-neutral-700 cursor-pointer disabled:opacity-50"
-              title="Descargar solo la auditoría de stock crítico y reposición"
-            >
-              <Boxes className="w-3.5 h-3.5 text-neutral-300" />
-              PDF Stock Crítico
-            </button>
-          </div>
+              <button
+                onClick={() => handleGeneratePDF('STOCK_ONLY')}
+                disabled={isGeneratingPDF}
+                className="w-full sm:w-auto justify-center px-3.5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors border border-neutral-700 cursor-pointer disabled:opacity-50"
+                title="Descargar solo la auditoría de stock crítico y reposición"
+              >
+                <Boxes className="w-3.5 h-3.5 text-neutral-300" />
+                PDF Stock Crítico
+              </button>
+            </div>
+          ) : (
+            <div className="text-xs text-neutral-400 bg-neutral-900 px-3 py-2 rounded-xl border border-neutral-800">
+              Exportación de reportes restringida para este usuario.
+            </div>
+          )}
         </div>
       </div>
 

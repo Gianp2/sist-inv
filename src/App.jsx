@@ -42,8 +42,17 @@ export default function App() {
               richColors
               closeButton
               theme="light"
+              gap={8}
               toastOptions={{
-                style: { borderRadius: '14px', background: '#ffffff', color: '#171717', border: '1px solid #e5e7eb' },
+                className: 'shadow-lg border rounded-2xl font-sans',
+                style: {
+                  borderRadius: '16px',
+                  background: '#ffffff',
+                  color: '#171717',
+                  border: '1px solid #e5e7eb',
+                  padding: '12px 16px',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03)',
+                },
               }}
             />
             <Routes>
@@ -60,25 +69,110 @@ export default function App() {
                 }
               >
                 <Route index element={<DashboardPage />} />
-                <Route path="caja" element={<CajaPage />} />
-                <Route path="productos" element={<ProductosPage />} />
-                <Route path="revision-precios" element={<RevisionPreciosPage />} />
-                <Route path="stock" element={<StockPage />} />
-                <Route path="categorias" element={<CategoriasPage />} />
-                <Route path="marcas" element={<MarcasPage />} />
-                <Route path="compras" element={<ComprasPage />} />
-                <Route path="clientes" element={<ClientesPage />} />
-                <Route path="proveedores" element={<ProveedoresPage />} />
+                <Route
+                  path="caja"
+                  element={
+                    <RoleRoute permission="cash.view">
+                      <CajaPage />
+                    </RoleRoute>
+                  }
+                />
+                {/* Products & Inventory */}
+                <Route
+                  path="productos"
+                  element={
+                    <RoleRoute permission="products.view">
+                      <ProductosPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="revision-precios"
+                  element={
+                    <RoleRoute permission="pricing.manage">
+                      <RevisionPreciosPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="stock"
+                  element={
+                    <RoleRoute permission="stock.view">
+                      <StockPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="categorias"
+                  element={
+                    <RoleRoute permission="categories.view">
+                      <CategoriasPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="marcas"
+                  element={
+                    <RoleRoute permission="brands.view">
+                      <MarcasPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="compras"
+                  element={
+                    <RoleRoute permission="purchases.view">
+                      <ComprasPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="clientes"
+                  element={
+                    <RoleRoute permission="customers.view">
+                      <ClientesPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="proveedores"
+                  element={
+                    <RoleRoute permission="suppliers.view">
+                      <ProveedoresPage />
+                    </RoleRoute>
+                  }
+                />
 
                 {/* Redirects from removed tickets/cart routes to Caja */}
                 <Route path="pos" element={<Navigate to="/caja" replace />} />
                 <Route path="ventas" element={<Navigate to="/caja" replace />} />
 
-                {/* Admin Management Routes */}
-                <Route path="dashboard" element={<Navigate to="/" replace />} />
-                <Route path="reportes" element={<ReportesPage />} />
-                <Route path="usuarios" element={<Navigate to="/" replace />} />
-                <Route path="configuracion" element={<ConfiguracionPage />} />
+                {/* Admin Management & Dashboard Routes */}
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route
+                  path="reportes"
+                  element={
+                    <RoleRoute permission="reports.view">
+                      <ReportesPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="usuarios"
+                  element={
+                    <RoleRoute allowedRoles={[ROLES.ADMIN]}>
+                      <UsuariosPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="configuracion"
+                  element={
+                    <RoleRoute permission="settings.view">
+                      <ConfiguracionPage />
+                    </RoleRoute>
+                  }
+                />
               </Route>
 
               {/* 404 Catch All */}
