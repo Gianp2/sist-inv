@@ -47,6 +47,10 @@
     "costHistory": {
       "title": "Cost History",
       "description": "Historical records of product unit costs, quantities, and supplier purchases"
+    },
+    "currentAccounts": {
+      "title": "Current Accounts",
+      "description": "Customer debts, credit purchases, payment history, and balances"
     }
   }
 }

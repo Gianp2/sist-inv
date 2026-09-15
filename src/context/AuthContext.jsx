@@ -7,6 +7,7 @@ import {
   resetPassword as resetPasswordService,
   getExistingAdmin,
   getStoredSession,
+  setStoredSession,
   quickSwitchRole,
 } from '../services/firebase/auth';
 import { COLLECTIONS } from '../constants/collections';

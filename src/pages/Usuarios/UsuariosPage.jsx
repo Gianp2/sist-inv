@@ -256,12 +256,12 @@ export function UsuariosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {users.map((u) => {
+                {users.map((u, idx) => {
                   const isMasterAdmin = u.role === ROLES.ADMIN;
                   const hasCustom = u.permissions && typeof u.permissions === 'object' && Object.keys(u.permissions).length > 0;
                   return (
                     <tr
-                      key={u.id || u.uid}
+                      key={u.id || u.uid ? `${u.id || u.uid}-${idx}` : `usr-${idx}`}
                       className={`hover:bg-neutral-50/80 transition-colors ${
                         isMasterAdmin ? 'bg-amber-50/30' : ''
                       }`}

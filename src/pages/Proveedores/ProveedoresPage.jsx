@@ -113,8 +113,8 @@ export function ProveedoresPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
-                {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-neutral-50/80 transition-colors">
+                {filtered.map((s, idx) => (
+                  <tr key={s.id ? `${s.id}-${idx}` : `sup-${idx}`} className="hover:bg-neutral-50/80 transition-colors">
                     <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
                       <Truck className="w-4 h-4 text-neutral-400" />
                       {s.name}

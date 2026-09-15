@@ -67,8 +67,8 @@ export function ComprasPage() {
           <>
             {/* Mobile View: Purchase Cards */}
             <div className="md:hidden divide-y divide-neutral-200">
-              {filtered.map((pur) => (
-                <div key={pur.id} className="py-3.5 space-y-1.5">
+              {filtered.map((pur, idx) => (
+                <div key={pur.id ? `${pur.id}-${idx}` : `pur-${idx}`} className="py-3.5 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-xs text-neutral-900">{pur.purchaseNumber}</span>
                     <span className="font-black text-xs text-neutral-900">{formatCurrency(pur.total)}</span>
@@ -102,8 +102,8 @@ export function ComprasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {filtered.map((pur) => (
-                    <tr key={pur.id} className="hover:bg-neutral-50/80 transition-colors">
+                  {filtered.map((pur, idx) => (
+                    <tr key={pur.id ? `${pur.id}-${idx}` : `pur-${idx}`} className="hover:bg-neutral-50/80 transition-colors">
                       <td className="p-3 font-mono font-bold text-neutral-900">
                         {pur.purchaseNumber}
                       </td>

@@ -10,7 +10,15 @@ import {
 import { toast } from 'sonner';
 
 export function useCategories() {
-  const [categories, setCategories] = useState(() => getCachedCollection(COLLECTIONS.CATEGORIES) || []);
+  const [categories, setCategories] = useState(() => {
+    const raw = getCachedCollection(COLLECTIONS.CATEGORIES) || [];
+    const seen = new Set();
+    return raw.filter((c) => {
+      if (!c || !c.id || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  });
   const [loading, setLoading] = useState(() => !getCachedCollection(COLLECTIONS.CATEGORIES));
 
   useEffect(() => {
@@ -18,7 +26,13 @@ export function useCategories() {
       COLLECTIONS.CATEGORIES,
       [],
       (data) => {
-        setCategories(data || []);
+        const seen = new Set();
+        const unique = (data || []).filter((c) => {
+          if (!c || !c.id || seen.has(c.id)) return false;
+          seen.add(c.id);
+          return true;
+        });
+        setCategories(unique);
         setLoading(false);
       },
       () => setLoading(false)
@@ -46,7 +60,15 @@ export function useCategories() {
 }
 
 export function useBrands() {
-  const [brands, setBrands] = useState(() => getCachedCollection(COLLECTIONS.BRANDS) || []);
+  const [brands, setBrands] = useState(() => {
+    const raw = getCachedCollection(COLLECTIONS.BRANDS) || [];
+    const seen = new Set();
+    return raw.filter((b) => {
+      if (!b || !b.id || seen.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+  });
   const [loading, setLoading] = useState(() => !getCachedCollection(COLLECTIONS.BRANDS));
 
   useEffect(() => {
@@ -54,7 +76,13 @@ export function useBrands() {
       COLLECTIONS.BRANDS,
       [],
       (data) => {
-        setBrands(data || []);
+        const seen = new Set();
+        const unique = (data || []).filter((b) => {
+          if (!b || !b.id || seen.has(b.id)) return false;
+          seen.add(b.id);
+          return true;
+        });
+        setBrands(unique);
         setLoading(false);
       },
       () => setLoading(false)

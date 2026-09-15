@@ -77,14 +77,25 @@ export function CashProvider({ children }) {
   }, [allMovements, currentShift?.id]);
 
   /**
-   * Open a new cash shift
+   * Open a new cash shift (Turno)
+   * Allows opening multiple shifts per day independently
    */
   const openCash = useCallback(async (initialAmount = 0, cashierName = 'Administrador', notes = '') => {
     const numInitial = Number(initialAmount) || 0;
+    const now = new Date();
+    const todayIsoDate = now.toISOString().split('T')[0];
+
+    // Calculate today's shift count for easy reference (Turno 1, Turno 2, etc.)
+    const todayShifts = shifts.filter((s) => s.openedAt && s.openedAt.startsWith(todayIsoDate));
+    const shiftNumber = todayShifts.length + 1;
+    const shiftLabel = `Turno #${shiftNumber} (${now.toLocaleDateString('es-AR')})`;
+
     const newShift = {
-      openedAt: new Date().toISOString(),
+      openedAt: now.toISOString(),
       closedAt: null,
       status: CASH_REGISTER_STATUS.OPEN,
+      shiftNumber,
+      shiftLabel,
       initialAmount: numInitial,
       totalIncome: 0,
       totalExpenses: 0,
@@ -106,48 +117,110 @@ export function CashProvider({ children }) {
       type: MOVEMENT_TYPES.INITIAL || 'APERTURA',
       category: 'Fondo Inicial',
       amount: numInitial,
-      description: 'Apertura de turno con fondo inicial de cambio',
+      description: `Apertura ${shiftLabel} con fondo inicial de cambio`,
       paymentMethod: 'EFECTIVO',
       user: cashierName,
-      date: new Date().toISOString(),
+      date: now.toISOString(),
     });
 
     return docResult;
-  }, []);
+  }, [shifts]);
 
   /**
-   * Close current cash shift (Arqueo)
+   * Close current cash shift (Arqueo de Caja)
+   * Saves independent complete snapshot with date/time, user, expected/counted cash,
+   * difference, all incomes, expenses, sales, and breakdown by payment method.
    */
   const closeCash = useCallback(async (finalCountedAmount = 0, notes = '', closedBy = 'Administrador') => {
     if (!currentShift?.id) throw new Error('No hay ninguna caja abierta en este momento.');
 
-    // Sum positive movements and negative movements in this shift
-    const shiftIncomes = currentShiftMovements
-      .filter((m) => m.type === 'INGRESO' || m.type === 'VENTA' || m.type === 'APERTURA_CAJA')
+    // Shift movements
+    const movementsInShift = allMovements.filter((m) => m.cashRegisterId === currentShift.id);
+
+    // Calculate physical cash in drawer (only EFECTIVO)
+    const cashIncomes = movementsInShift
+      .filter(
+        (m) =>
+          (m.type === 'INGRESO' || m.type === 'VENTA') &&
+          (m.paymentMethod === 'EFECTIVO' || !m.paymentMethod)
+      )
       .reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
 
-    const shiftExpenses = currentShiftMovements
-      .filter((m) => m.type === 'EGRESO' || m.type === 'RETIRO' || m.type === 'COMPRA' || m.type === 'GASTO')
+    const cashExpenses = movementsInShift
+      .filter(
+        (m) =>
+          (m.type === 'EGRESO' || m.type === 'RETIRO' || m.type === 'GASTO' || m.type === 'COMPRA') &&
+          (m.paymentMethod === 'EFECTIVO' || !m.paymentMethod)
+      )
       .reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
 
-    const expected = (currentShift.initialAmount || 0) + (shiftIncomes - (currentShift.initialAmount || 0)) - shiftExpenses;
+    const initialCash = Number(currentShift.initialAmount) || 0;
+    const expectedCash = initialCash + cashIncomes - cashExpenses;
     const finalAmount = Number(finalCountedAmount) || 0;
-    const difference = finalAmount - expected;
+    const difference = finalAmount - expectedCash;
+
+    // All incomes and expenses (across all payment channels)
+    const allIncomes = movementsInShift
+      .filter((m) => m.type === 'INGRESO' || m.type === 'VENTA')
+      .reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+
+    const allExpenses = movementsInShift
+      .filter((m) => m.type === 'EGRESO' || m.type === 'RETIRO' || m.type === 'GASTO' || m.type === 'COMPRA')
+      .reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+
+    const salesMovements = movementsInShift.filter((m) => m.type === 'VENTA');
+    const totalSalesAmount = salesMovements.reduce((acc, m) => acc + (Number(m.amount) || 0), 0);
+
+    // Breakdown by payment method
+    const breakdown = {
+      EFECTIVO: movementsInShift
+        .filter((m) => m.type === 'VENTA' && (m.paymentMethod === 'EFECTIVO' || !m.paymentMethod))
+        .reduce((acc, m) => acc + (Number(m.amount) || 0), 0),
+      TARJETA_DEBITO: movementsInShift
+        .filter((m) => m.type === 'VENTA' && m.paymentMethod === 'TARJETA_DEBITO')
+        .reduce((acc, m) => acc + (Number(m.amount) || 0), 0),
+      TARJETA_CREDITO: movementsInShift
+        .filter((m) => m.type === 'VENTA' && m.paymentMethod === 'TARJETA_CREDITO')
+        .reduce((acc, m) => acc + (Number(m.amount) || 0), 0),
+      TRANSFERENCIA: movementsInShift
+        .filter((m) => m.type === 'VENTA' && m.paymentMethod === 'TRANSFERENCIA')
+        .reduce((acc, m) => acc + (Number(m.amount) || 0), 0),
+      CUENTA_CORRIENTE: movementsInShift
+        .filter((m) => m.type === 'VENTA' && m.paymentMethod === 'CUENTA_CORRIENTE')
+        .reduce((acc, m) => acc + (Number(m.amount) || 0), 0),
+    };
 
     const closingData = {
       status: CASH_REGISTER_STATUS.CLOSED,
       closedAt: new Date().toISOString(),
       closedBy,
+      initialAmount: initialCash,
       finalAmount,
-      expectedAmount: expected,
+      expectedAmount: expectedCash,
       difference,
       closingNotes: notes,
-      totalIncome: shiftIncomes,
-      totalExpenses: shiftExpenses,
+      totalIncome: allIncomes,
+      totalExpenses: allExpenses,
+      totalSales: totalSalesAmount,
+      salesCount: salesMovements.length,
+      movementsCount: movementsInShift.length,
+      cashIncomes,
+      cashExpenses,
+      breakdown,
+      movementsSummary: movementsInShift.map((m) => ({
+        id: m.id,
+        type: m.type,
+        amount: m.amount,
+        paymentMethod: m.paymentMethod || 'EFECTIVO',
+        description: m.description,
+        user: m.user,
+        date: m.date,
+      })),
     };
 
     await updateDocument(COLLECTIONS.CASH_REGISTERS, currentShift.id, closingData);
-  }, [currentShift, currentShiftMovements]);
+    return closingData;
+  }, [currentShift, allMovements]);
 
   /**
    * Add a manual income or expense
@@ -262,6 +335,13 @@ export function CashProvider({ children }) {
     }
   }, [allMovements, currentShift]);
 
+  /**
+   * Delete closed shift record (Admin only)
+   */
+  const deleteShift = useCallback(async (shiftId) => {
+    await deleteDocument(COLLECTIONS.CASH_REGISTERS, shiftId);
+  }, []);
+
   const value = {
     shifts,
     allMovements,
@@ -273,6 +353,7 @@ export function CashProvider({ children }) {
     openCashRegister: openCash,
     closeCash,
     closeCashRegister: closeCash,
+    deleteShift,
     addMovement,
     updateMovement,
     addManualMovement: (type, amount, description, user, category, paymentMethod) =>

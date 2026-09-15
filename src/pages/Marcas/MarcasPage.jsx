@@ -53,7 +53,7 @@ export function MarcasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Marcas
@@ -63,14 +63,20 @@ export function MarcasPage() {
           </p>
         </div>
         {can('brands.create') && (
-          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={Plus}
+            onClick={handleOpenCreate}
+            className="w-full sm:w-auto h-11 sm:h-9 text-xs font-bold justify-center"
+          >
             Nueva Marca
           </Button>
         )}
       </div>
 
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 p-4 shadow-xs">
-        <div className="relative max-w-md mb-4">
+        <div className="relative max-w-md mb-4 mx-auto sm:mx-0">
           <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
           <input
             type="text"
@@ -84,65 +90,124 @@ export function MarcasPage() {
         {loading ? (
           <TableSkeleton rows={4} cols={3} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
-                <tr>
-                  <th className="p-3">Marca</th>
-                  <th className="p-3">Origen</th>
-                  <th className="p-3">Descripción</th>
-                  {(can('brands.edit') || can('brands.delete')) && (
-                    <th className="p-3 text-right">Acciones</th>
+          <>
+            {/* Mobile View: Cards */}
+            <div className="md:hidden divide-y divide-neutral-200">
+              {filtered.map((brand, idx) => (
+                <div key={brand.id ? `${brand.id}-${idx}` : `brand-${idx}`} className="py-3.5 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0 border border-neutral-200">
+                        <Bookmark className="w-4 h-4 text-neutral-700" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-neutral-900">{brand.name}</p>
+                        <span className="text-[11px] font-medium text-neutral-500">
+                          {brand.origin || 'Nacional'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {brand.description && (
+                    <p className="text-xs text-neutral-600 bg-neutral-50 p-2 rounded-xl border border-neutral-100">
+                      {brand.description}
+                    </p>
                   )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {filtered.map((brand) => (
-                  <tr key={brand.id} className="hover:bg-neutral-50/80 transition-colors">
-                    <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
-                      <Bookmark className="w-4 h-4 text-neutral-400" />
-                      {brand.name}
-                    </td>
-                    <td className="p-3 text-neutral-700 font-medium">
-                      {brand.origin || 'Nacional'}
-                    </td>
-                    <td className="p-3 text-neutral-600 font-medium">{brand.description || '-'}</td>
+
+                  {(can('brands.edit') || can('brands.delete')) && (
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-neutral-100">
+                      {can('brands.edit') && (
+                        <button
+                          onClick={() => handleOpenEdit(brand)}
+                          className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Editar</span>
+                        </button>
+                      )}
+                      {can('brands.delete') && (
+                        <button
+                          onClick={() => setDeletingId(brand.id)}
+                          className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {filtered.length === 0 && (
+                <div className="p-8 text-center text-neutral-400 text-xs">
+                  No se encontraron marcas registradas
+                </div>
+              )}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
+                  <tr>
+                    <th className="p-3">Marca</th>
+                    <th className="p-3">Origen</th>
+                    <th className="p-3">Descripción</th>
                     {(can('brands.edit') || can('brands.delete')) && (
-                      <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {can('brands.edit') && (
-                            <button
-                              onClick={() => handleOpenEdit(brand)}
-                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                              title="Editar"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                          )}
-                          {can('brands.delete') && (
-                            <button
-                              onClick={() => setDeletingId(brand.id)}
-                              className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      <th className="p-3 text-right">Acciones</th>
                     )}
                   </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-neutral-400 text-xs">
-                      No se encontraron marcas registradas
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {filtered.map((brand, idx) => (
+                    <tr key={brand.id ? `${brand.id}-${idx}` : `brand-${idx}`} className="hover:bg-neutral-50/80 transition-colors">
+                      <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
+                        <Bookmark className="w-4 h-4 text-neutral-400" />
+                        {brand.name}
+                      </td>
+                      <td className="p-3 text-neutral-700 font-medium">
+                        {brand.origin || 'Nacional'}
+                      </td>
+                      <td className="p-3 text-neutral-600 font-medium">{brand.description || '-'}</td>
+                      {(can('brands.edit') || can('brands.delete')) && (
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {can('brands.edit') && (
+                              <button
+                                onClick={() => handleOpenEdit(brand)}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            {can('brands.delete') && (
+                              <button
+                                onClick={() => setDeletingId(brand.id)}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-neutral-400 text-xs">
+                        No se encontraron marcas registradas
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

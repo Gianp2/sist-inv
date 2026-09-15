@@ -127,8 +127,8 @@ export function ClientesPage() {
           <>
             {/* Mobile View: Client Cards */}
             <div className="md:hidden divide-y divide-neutral-200">
-              {filtered.map((c) => (
-                <div key={c.id} className="py-3.5 space-y-2">
+              {filtered.map((c, idx) => (
+                <div key={c.id ? `${c.id}-${idx}` : `cust-${idx}`} className="py-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-9 h-9 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center text-sm font-black border border-neutral-200">
@@ -199,8 +199,8 @@ export function ClientesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {filtered.map((c) => (
-                    <tr key={c.id} className="hover:bg-neutral-50/80 transition-colors">
+                  {filtered.map((c, idx) => (
+                    <tr key={c.id ? `${c.id}-${idx}` : `cust-${idx}`} className="hover:bg-neutral-50/80 transition-colors">
                       <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-neutral-200 text-neutral-800 flex items-center justify-center text-xs font-black">
                           {c.name?.charAt(0) || 'C'}

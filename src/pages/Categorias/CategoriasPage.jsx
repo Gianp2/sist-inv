@@ -53,7 +53,7 @@ export function CategoriasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
         <div>
           <h1 className="text-2xl font-black text-neutral-900 tracking-tight">
             Categorías de Ropa
@@ -63,14 +63,20 @@ export function CategoriasPage() {
           </p>
         </div>
         {can('categories.create') && (
-          <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={Plus}
+            onClick={handleOpenCreate}
+            className="w-full sm:w-auto h-11 sm:h-9 text-xs font-bold justify-center"
+          >
             Nueva Categoría
           </Button>
         )}
       </div>
 
       <div className="card-panel bg-white rounded-2xl border border-neutral-200 p-4 shadow-xs">
-        <div className="relative max-w-md mb-4">
+        <div className="relative max-w-md mb-4 mx-auto sm:mx-0">
           <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
           <input
             type="text"
@@ -84,65 +90,126 @@ export function CategoriasPage() {
         {loading ? (
           <TableSkeleton rows={4} cols={3} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
-                <tr>
-                  <th className="p-3">Nombre</th>
-                  <th className="p-3">Código</th>
-                  <th className="p-3">Descripción</th>
-                  {(can('categories.edit') || can('categories.delete')) && (
-                    <th className="p-3 text-right">Acciones</th>
+          <>
+            {/* Mobile View: Cards */}
+            <div className="md:hidden divide-y divide-neutral-200">
+              {filtered.map((cat, idx) => (
+                <div key={cat.id ? `${cat.id}-${idx}` : `cat-${idx}`} className="py-3.5 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0 border border-neutral-200">
+                        <Tags className="w-4 h-4 text-neutral-700" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-neutral-900">{cat.name}</p>
+                        {cat.code && (
+                          <span className="font-mono text-[11px] font-bold text-neutral-500">
+                            Cód: {cat.code}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {cat.description && (
+                    <p className="text-xs text-neutral-600 bg-neutral-50 p-2 rounded-xl border border-neutral-100">
+                      {cat.description}
+                    </p>
                   )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {filtered.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-neutral-50/80 transition-colors">
-                    <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
-                      <Tags className="w-4 h-4 text-neutral-400" />
-                      {cat.name}
-                    </td>
-                    <td className="p-3 font-mono font-bold text-neutral-700">
-                      {cat.code || '-'}
-                    </td>
-                    <td className="p-3 text-neutral-600 font-medium">{cat.description || '-'}</td>
+
+                  {(can('categories.edit') || can('categories.delete')) && (
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-neutral-100">
+                      {can('categories.edit') && (
+                        <button
+                          onClick={() => handleOpenEdit(cat)}
+                          className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Editar</span>
+                        </button>
+                      )}
+                      {can('categories.delete') && (
+                        <button
+                          onClick={() => setDeletingId(cat.id)}
+                          className="min-h-[40px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {filtered.length === 0 && (
+                <div className="p-8 text-center text-neutral-400 text-xs">
+                  No se encontraron categorías registradas
+                </div>
+              )}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white text-neutral-800 font-bold border-b border-neutral-200">
+                  <tr>
+                    <th className="p-3">Nombre</th>
+                    <th className="p-3">Código</th>
+                    <th className="p-3">Descripción</th>
                     {(can('categories.edit') || can('categories.delete')) && (
-                      <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {can('categories.edit') && (
-                            <button
-                              onClick={() => handleOpenEdit(cat)}
-                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
-                              title="Editar"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                          )}
-                          {can('categories.delete') && (
-                            <button
-                              onClick={() => setDeletingId(cat.id)}
-                              className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      <th className="p-3 text-right">Acciones</th>
                     )}
                   </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-neutral-400 text-xs">
-                      No se encontraron categorías registradas
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {filtered.map((cat, idx) => (
+                    <tr key={cat.id ? `${cat.id}-${idx}` : `cat-${idx}`} className="hover:bg-neutral-50/80 transition-colors">
+                      <td className="p-3 font-bold text-neutral-900 flex items-center gap-2">
+                        <Tags className="w-4 h-4 text-neutral-400" />
+                        {cat.name}
+                      </td>
+                      <td className="p-3 font-mono font-bold text-neutral-700">
+                        {cat.code || '-'}
+                      </td>
+                      <td className="p-3 text-neutral-600 font-medium">{cat.description || '-'}</td>
+                      {(can('categories.edit') || can('categories.delete')) && (
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {can('categories.edit') && (
+                              <button
+                                onClick={() => handleOpenEdit(cat)}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            {can('categories.delete') && (
+                              <button
+                                onClick={() => setDeletingId(cat.id)}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-neutral-100 transition-colors cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-neutral-400 text-xs">
+                        No se encontraron categorías registradas
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

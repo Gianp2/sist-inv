@@ -14,7 +14,15 @@ import { formatCurrency } from '../utils/formatters';
 import { toastAlert, toast } from '../components/ui/Toast';
 
 export function useProducts() {
-  const [products, setProducts] = useState(() => getCachedCollection(COLLECTIONS.PRODUCTS) || []);
+  const [products, setProducts] = useState(() => {
+    const raw = getCachedCollection(COLLECTIONS.PRODUCTS) || [];
+    const seen = new Set();
+    return raw.filter((p) => {
+      if (!p || !p.id || seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  });
   const [loading, setLoading] = useState(() => !getCachedCollection(COLLECTIONS.PRODUCTS));
 
   useEffect(() => {
@@ -22,7 +30,13 @@ export function useProducts() {
       COLLECTIONS.PRODUCTS,
       [],
       (data) => {
-        setProducts(data || []);
+        const seen = new Set();
+        const unique = (data || []).filter((p) => {
+          if (!p || !p.id || seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setProducts(unique);
         setLoading(false);
       },
       (err) => {

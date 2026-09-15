@@ -59,7 +59,8 @@ import {
 import { useProducts } from '../../hooks/useProducts';
 import { useCustomers } from '../../hooks/useContacts';
 import { RegistrarIngresoModal } from './RegistrarIngresoModal';
-import { addDocument, updateDocument, getDocument } from '../../services/firebase/firestore';
+import { CierreDetalleModal } from './CierreDetalleModal';
+import { addDocument, updateDocument, getDocument, subscribeCollection, getCachedCollection } from '../../services/firebase/firestore';
 import { COLLECTIONS } from '../../constants/collections';
 import { calculateTotalStock } from '../../utils/calculations';
 import { toastAlert, toast } from '../../components/ui/Toast';
@@ -73,6 +74,7 @@ export function CajaPage() {
     shifts,
     openCash,
     closeCash,
+    deleteShift,
     addMovement,
     updateMovement,
     deleteMovement,
@@ -82,6 +84,28 @@ export function CajaPage() {
   const { products } = useProducts();
   const { customers } = useCustomers();
   const { settings } = useSettings();
+
+  // All Sales for audit and shift relations
+  const [allSales, setAllSales] = useState(() => {
+    const cached = getCachedCollection(COLLECTIONS.SALES);
+    return cached || [];
+  });
+
+  useEffect(() => {
+    const unsub = subscribeCollection(COLLECTIONS.SALES, [], (data) => {
+      setAllSales(data || []);
+    });
+    return () => unsub();
+  }, []);
+
+  // Shift Detail Modal State
+  const [selectedShiftForDetail, setSelectedShiftForDetail] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Shift Delete Confirmation State (Admin Only)
+  const [shiftToDelete, setShiftToDelete] = useState(null);
+  const [deleteShiftModalOpen, setDeleteShiftModalOpen] = useState(false);
+  const [isDeletingShift, setIsDeletingShift] = useState(false);
 
   // Active Main Tab: 'TODOS' | 'TURNO' | 'MES' | 'SEMANA' | 'HISTORIAL'
   const [activeTab, setActiveTab] = useState(() => (can('dashboard.financials') ? 'TODOS' : 'TURNO'));
@@ -240,6 +264,8 @@ export function CajaPage() {
           items,
           total: Number(total),
           paymentMethod,
+          isCredit: paymentMethod === 'CUENTA_CORRIENTE',
+          cashRegisterId: currentShift?.id || null,
           customerId: customerId || null,
           customerName: customerName || 'Consumidor Final',
           seller: user?.displayName || 'Administrador',
@@ -250,30 +276,52 @@ export function CajaPage() {
         console.error('Error recording sale doc:', err);
       }
 
-      // 3. Update customer stats if customer selected
-      if (customerId) {
-        try {
-          const cust = await getDocument(COLLECTIONS.CUSTOMERS, customerId);
-          if (cust) {
-            await updateDocument(COLLECTIONS.CUSTOMERS, customerId, {
-              totalPurchases: (Number(cust.totalPurchases) || 0) + Number(total),
-              purchaseCount: (Number(cust.purchaseCount) || 0) + 1,
-              lastPurchaseDate: new Date().toISOString(),
-            });
-          }
-        } catch (err) {
-          console.error('Error updating customer:', err);
-        }
-      }
-
-      // 4. Record Cash Movement
       const itemsSummary = items
         .map((i) => `${i.productName} (${i.size}/${i.color}) x${i.quantity}`)
         .join(', ');
 
+      // 3. Update customer stats & Current Account if customer selected
+      if (customerId) {
+        try {
+          const cust = await getDocument(COLLECTIONS.CUSTOMERS, customerId);
+          if (cust) {
+            const currentDebt = Number(cust.currentBalance) || 0;
+            const newDebt = paymentMethod === 'CUENTA_CORRIENTE' ? currentDebt + Number(total) : currentDebt;
+
+            await updateDocument(COLLECTIONS.CUSTOMERS, customerId, {
+              totalPurchases: (Number(cust.totalPurchases) || 0) + Number(total),
+              purchaseCount: (Number(cust.purchaseCount) || 0) + 1,
+              currentBalance: newDebt,
+              lastPurchaseDate: new Date().toISOString(),
+            });
+
+            // Automatically record debt in Current Accounts
+            if (paymentMethod === 'CUENTA_CORRIENTE') {
+              await addDocument(COLLECTIONS.CURRENT_ACCOUNTS, {
+                customerId,
+                customerName: customerName || cust.name,
+                customerPhone: cust.phone || '',
+                type: 'DEUDA',
+                amount: Number(total),
+                saleNumber,
+                itemsSummary,
+                notes: notes || `Venta a Cuenta Corriente ${saleNumber}`,
+                user: user?.displayName || 'Administrador',
+                date: date || new Date().toISOString(),
+                previousBalance: currentDebt,
+                balanceAfter: newDebt,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error updating customer debt:', err);
+        }
+      }
+
+      // 4. Record Cash Movement
       await addMovement({
         type: 'VENTA',
-        category: 'Venta Mostrador',
+        category: paymentMethod === 'CUENTA_CORRIENTE' ? 'Venta Cuenta Corriente' : 'Venta Mostrador',
         amount: Number(total),
         description: `Venta ${saleNumber}: ${itemsSummary}${notes ? ` - ${notes}` : ''}`,
         paymentMethod,
@@ -1244,64 +1292,295 @@ export function CajaPage() {
 
       {/* --- TAB 4: HISTORIAL DE CIERRES --- */}
       {activeTab === 'HISTORIAL' && (
-        <Card className="p-5">
-          <CardHeader
-            title="Historial de Cajas y Arqueos Cerrados"
-            subtitle="Registro histórico de auditoría de cada turno finalizado"
-          />
-          <div className="overflow-x-auto mt-3">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
-                <tr>
-                  <th className="p-3">Apertura</th>
-                  <th className="p-3">Cierre</th>
-                  <th className="p-3">Responsable</th>
-                  <th className="p-3 text-right">Fondo Inicial</th>
-                  <th className="p-3 text-right">Esperado</th>
-                  <th className="p-3 text-right">Contado Real</th>
-                  <th className="p-3 text-right">Diferencia</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {shifts.map((shift) => (
-                  <tr key={shift.id} className="hover:bg-neutral-50/60">
-                    <td className="p-3 font-mono text-neutral-600">{formatDate(shift.openedAt, 'full')}</td>
-                    <td className="p-3 font-mono text-neutral-600">
-                      {shift.closedAt ? formatDate(shift.closedAt, 'full') : (
-                        <Badge size="xs" variant="success">En Curso</Badge>
-                      )}
-                    </td>
-                    <td className="p-3 font-medium text-neutral-800">{shift.openedBy || shift.cashierName}</td>
-                    <td className="p-3 text-right font-mono">{formatCurrency(shift.initialAmount || 0)}</td>
-                    <td className="p-3 text-right font-mono font-bold">{formatCurrency(shift.expectedAmount || 0)}</td>
-                    <td className="p-3 text-right font-mono font-bold">
-                      {shift.finalAmount !== null && shift.finalAmount !== undefined
-                        ? formatCurrency(shift.finalAmount)
-                        : '-'}
-                    </td>
-                    <td className="p-3 text-right font-black">
-                      {shift.difference ? (
-                        <span className={shift.difference >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                          {shift.difference > 0 ? '+' : ''}
-                          {formatCurrency(shift.difference)}
-                        </span>
-                      ) : (
-                        <span className="text-neutral-400">$0.00</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {shifts.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-6 text-center text-neutral-400 text-xs">
-                      No hay registros históricos de cierres de caja
-                    </td>
-                  </tr>
+        <div className="space-y-4">
+          {/* Summary KPI Banner for Historical Closings */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Card className="p-3.5">
+              <span className="text-[11px] font-bold text-neutral-500 uppercase">Cierres Realizados</span>
+              <p className="text-xl font-black text-neutral-900 mt-0.5">
+                {shifts.filter((s) => s.closedAt).length}
+              </p>
+              <span className="text-[10px] text-neutral-400">turnos finalizados</span>
+            </Card>
+
+            <Card className="p-3.5 border-neutral-200">
+              <span className="text-[11px] font-bold text-neutral-500 uppercase">Ventas en Cierres</span>
+              <p className="text-xl font-black text-neutral-900 mt-0.5">
+                {formatCurrency(
+                  shifts.filter((s) => s.closedAt).reduce((sum, s) => sum + (Number(s.totalSales) || 0), 0)
                 )}
-              </tbody>
-            </table>
+              </p>
+              <span className="text-[10px] text-neutral-400">acumulado total</span>
+            </Card>
+
+            <Card className="p-3.5 border-emerald-200/60 bg-emerald-50/30">
+              <span className="text-[11px] font-bold text-emerald-800 uppercase">Ingresos Totales</span>
+              <p className="text-xl font-black text-emerald-700 mt-0.5">
+                {formatCurrency(
+                  shifts.filter((s) => s.closedAt).reduce((sum, s) => sum + (Number(s.totalIncome) || 0), 0)
+                )}
+              </p>
+              <span className="text-[10px] text-emerald-600/80">en turnos cerrados</span>
+            </Card>
+
+            <Card className="p-3.5 border-rose-200/60 bg-rose-50/30">
+              <span className="text-[11px] font-bold text-rose-800 uppercase">Egresos Totales</span>
+              <p className="text-xl font-black text-rose-700 mt-0.5">
+                {formatCurrency(
+                  shifts.filter((s) => s.closedAt).reduce((sum, s) => sum + (Number(s.totalExpenses) || 0), 0)
+                )}
+              </p>
+              <span className="text-[10px] text-rose-600/80">gastos y compras</span>
+            </Card>
           </div>
-        </Card>
+
+          <Card className="p-0 overflow-hidden">
+            <div className="p-4 bg-neutral-50 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-black text-neutral-900">Historial de Cajas y Arqueos Cerrados</h3>
+                <p className="text-xs text-neutral-500">
+                  Cada cierre es independiente con fecha, responsable, dinero esperado vs contado y ventas correspondientes
+                </p>
+              </div>
+              <span className="text-xs font-bold text-neutral-600 bg-white px-2.5 py-1 rounded-xl border border-neutral-200 self-start sm:self-auto">
+                {shifts.length} registros
+              </span>
+            </div>
+
+            {/* Mobile View: Cards */}
+            <div className="md:hidden divide-y divide-neutral-200">
+              {shifts.map((shift, idx) => {
+                const isClosed = !!shift.closedAt;
+                const diff = Number(shift.difference) || 0;
+                const hasDiff = Math.abs(diff) > 0.01;
+
+                return (
+                  <div key={shift.id ? `${shift.id}-${idx}` : `shift-${idx}`} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-neutral-900">
+                            {shift.shiftLabel || (shift.shiftNumber ? `Turno #${shift.shiftNumber}` : 'Turno')}
+                          </span>
+                          {!isClosed ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">
+                              ACTIVO
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                              CERRADO
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-neutral-500 mt-1">
+                          Abre: <strong className="text-neutral-700">{shift.openedBy || shift.cashierName}</strong>
+                          {shift.closedBy && <span> • Cierra: <strong className="text-neutral-700">{shift.closedBy}</strong></span>}
+                        </p>
+                        <p className="text-[11px] font-mono text-neutral-400 mt-0.5">
+                          {formatDate(shift.openedAt, 'full')}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-xs text-neutral-400 font-medium block">Ventas:</span>
+                        <span className="text-sm font-black font-mono text-neutral-900">
+                          {formatCurrency(shift.totalSales || 0)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Metrics 2x2 Grid */}
+                    <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs">
+                      <div>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase block">Esperado</span>
+                        <span className="font-mono font-bold text-neutral-900">
+                          {formatCurrency(shift.expectedAmount || 0)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase block">Contado Real</span>
+                        <span className="font-mono font-bold text-neutral-900">
+                          {shift.finalAmount !== null && shift.finalAmount !== undefined
+                            ? formatCurrency(shift.finalAmount)
+                            : '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase block">Fondo Inicio</span>
+                        <span className="font-mono text-neutral-700">
+                          {formatCurrency(shift.initialAmount || 0)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-neutral-500 font-bold uppercase block">Diferencia</span>
+                        {hasDiff ? (
+                          <span className={`font-mono font-black ${diff > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {diff > 0 ? '+' : ''}
+                            {formatCurrency(diff)}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-neutral-500">$0.00</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Mobile Action Buttons */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        leftIcon={FileText}
+                        onClick={() => {
+                          setSelectedShiftForDetail(shift);
+                          setIsDetailModalOpen(true);
+                        }}
+                        className="flex-1 h-11 text-xs font-bold justify-center"
+                      >
+                        Ver Detalle del Cierre
+                      </Button>
+
+                      {canManageFinancials && isClosed && (
+                        <button
+                          type="button"
+                          title="Eliminar registro de cierre"
+                          onClick={() => {
+                            setShiftToDelete(shift);
+                            setDeleteShiftModalOpen(true);
+                          }}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-neutral-200 transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {shifts.length === 0 && (
+                <div className="p-8 text-center text-neutral-400 text-xs">
+                  No hay registros de turnos ni cierres de caja.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
+                  <tr>
+                    <th className="p-3">Turno</th>
+                    <th className="p-3">Apertura</th>
+                    <th className="p-3">Cierre</th>
+                    <th className="p-3">Responsables</th>
+                    <th className="p-3 text-right">Fondo</th>
+                    <th className="p-3 text-right">Esperado</th>
+                    <th className="p-3 text-right">Contado Real</th>
+                    <th className="p-3 text-right">Diferencia</th>
+                    <th className="p-3 text-right">Ventas</th>
+                    <th className="p-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 bg-white">
+                  {shifts.map((shift, idx) => {
+                    const isClosed = !!shift.closedAt;
+                    const diff = Number(shift.difference) || 0;
+                    const hasDiff = Math.abs(diff) > 0.01;
+
+                    return (
+                      <tr key={shift.id ? `${shift.id}-${idx}` : `shift-${idx}`} className="hover:bg-neutral-50/70 transition-colors">
+                        <td className="p-3 font-bold text-neutral-900 whitespace-nowrap">
+                          {shift.shiftLabel || (shift.shiftNumber ? `Turno #${shift.shiftNumber}` : 'Turno')}
+                          {!isClosed && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                              ACTIVO
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 font-mono text-neutral-600 whitespace-nowrap">
+                          {formatDate(shift.openedAt, 'full')}
+                        </td>
+                        <td className="p-3 font-mono text-neutral-600 whitespace-nowrap">
+                          {isClosed ? formatDate(shift.closedAt, 'full') : (
+                            <span className="text-emerald-600 font-bold">En Curso</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-neutral-700 whitespace-nowrap">
+                          <p className="font-medium text-neutral-900">{shift.openedBy || shift.cashierName}</p>
+                          {shift.closedBy && (
+                            <p className="text-[10px] text-neutral-400">Cierra: {shift.closedBy}</p>
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-mono text-neutral-600 whitespace-nowrap">
+                          {formatCurrency(shift.initialAmount || 0)}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-neutral-900 whitespace-nowrap">
+                          {formatCurrency(shift.expectedAmount || 0)}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-neutral-900 whitespace-nowrap">
+                          {shift.finalAmount !== null && shift.finalAmount !== undefined
+                            ? formatCurrency(shift.finalAmount)
+                            : '-'}
+                        </td>
+                        <td className="p-3 text-right font-black whitespace-nowrap">
+                          {hasDiff ? (
+                            <span className={diff > 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                              {diff > 0 ? '+' : ''}
+                              {formatCurrency(diff)}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400 font-normal">$0.00</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-neutral-900 whitespace-nowrap">
+                          {formatCurrency(shift.totalSales || 0)}
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              leftIcon={FileText}
+                              onClick={() => {
+                                setSelectedShiftForDetail(shift);
+                                setIsDetailModalOpen(true);
+                              }}
+                              className="text-[11px]"
+                            >
+                              Ver Cierre
+                            </Button>
+
+                            {/* Immutable for regular users; Only Owner/Admin can delete if needed */}
+                            {canManageFinancials && isClosed && (
+                              <button
+                                type="button"
+                                title="Eliminar registro de cierre (Solo Administrador)"
+                                onClick={() => {
+                                  setShiftToDelete(shift);
+                                  setDeleteShiftModalOpen(true);
+                                }}
+                                className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {shifts.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="p-8 text-center text-neutral-400 text-xs">
+                        No hay registros de turnos ni cierres de caja.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* --- MOVEMENTS TABLE & MOBILE CARDS (Full CRUD with Edit and Delete) --- */}
@@ -1402,11 +1681,11 @@ export function CajaPage() {
 
         {/* Mobile View: Cards Layout (visible on small screens) */}
         <div className="sm:hidden mt-3 space-y-3">
-          {displayedMovements.map((m) => {
+          {displayedMovements.map((m, idx) => {
             const isPositive = m.type === 'INGRESO' || m.type === 'VENTA' || m.type === 'APERTURA_CAJA';
             return (
               <div
-                key={`mobile-${m.id}`}
+                key={m.id ? `mobile-${m.id}-${idx}` : `mobile-mov-${idx}`}
                 className="p-3.5 rounded-xl border border-neutral-200 bg-white space-y-2.5 shadow-2xs"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -1496,10 +1775,10 @@ export function CajaPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {displayedMovements.map((m) => {
+              {displayedMovements.map((m, idx) => {
                 const isPositive = m.type === 'INGRESO' || m.type === 'VENTA' || m.type === 'APERTURA_CAJA';
                 return (
-                  <tr key={m.id} className="hover:bg-neutral-50/60 transition-colors">
+                  <tr key={m.id ? `table-${m.id}-${idx}` : `table-mov-${idx}`} className="hover:bg-neutral-50/60 transition-colors">
                     <td className="p-3 text-neutral-500 font-mono whitespace-nowrap">
                       {formatDate(m.date, 'full')}
                     </td>
@@ -1991,6 +2270,104 @@ export function CajaPage() {
             >
               <Trash2 className="w-4 h-4" />
               Eliminar Definitivamente
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* --- MODAL: DETALLE AUDITORÍA DEL CIERRE DE CAJA --- */}
+      <CierreDetalleModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedShiftForDetail(null);
+        }}
+        shift={selectedShiftForDetail}
+        movements={allMovements}
+        sales={allSales}
+      />
+
+      {/* --- MODAL: CONFIRMAR ELIMINACIÓN DE CIERRE (Solo Administrador) --- */}
+      <Modal
+        isOpen={deleteShiftModalOpen}
+        onClose={() => !isDeletingShift && setDeleteShiftModalOpen(false)}
+        title="Eliminar Registro de Cierre"
+        subtitle="Esta acción borrará el registro de auditoría del cierre seleccionado"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-rose-800">
+              <p className="font-bold">¿Estás seguro de eliminar este registro histórico?</p>
+              <p className="mt-1">
+                Solo el administrador o dueño del negocio puede realizar esta acción. Los movimientos y ventas individuales no serán borrados.
+              </p>
+            </div>
+          </div>
+
+          {shiftToDelete && (
+            <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Turno:</span>
+                <span className="font-bold text-neutral-800">
+                  {shiftToDelete.shiftLabel || `Turno #${shiftToDelete.shiftNumber || 1}`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Apertura:</span>
+                <span className="text-neutral-700 font-mono">
+                  {formatDate(shiftToDelete.openedAt, 'full')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Cierre:</span>
+                <span className="text-neutral-700 font-mono">
+                  {shiftToDelete.closedAt ? formatDate(shiftToDelete.closedAt, 'full') : 'En curso'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Total Ventas:</span>
+                <span className="font-bold text-neutral-900">
+                  {formatCurrency(shiftToDelete.totalSales || 0)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-neutral-100">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteShiftModalOpen(false)}
+              disabled={isDeletingShift}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              loading={isDeletingShift}
+              onClick={async () => {
+                if (!shiftToDelete) return;
+                try {
+                  setIsDeletingShift(true);
+                  await deleteShift(shiftToDelete.id);
+                  toastAlert.success('Cierre eliminado', 'El registro de cierre ha sido eliminado.');
+                  setDeleteShiftModalOpen(false);
+                  setShiftToDelete(null);
+                } catch (err) {
+                  toastAlert.error('Error al eliminar cierre', err.message || 'No se pudo eliminar el registro.');
+                } finally {
+                  setIsDeletingShift(false);
+                }
+              }}
+              className="flex items-center gap-1.5"
+            >
+              <Trash2 className="w-4 h-4" />
+              Confirmar Eliminación
             </Button>
           </div>
         </div>

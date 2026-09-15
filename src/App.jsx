@@ -23,6 +23,7 @@ import { CategoriasPage } from './pages/Categorias/CategoriasPage';
 import { MarcasPage } from './pages/Marcas/MarcasPage';
 import { ComprasPage } from './pages/Compras/ComprasPage';
 import { CajaPage } from './pages/Caja/CajaPage';
+import { CuentasCorrientesPage } from './pages/CuentasCorrientes/CuentasCorrientesPage';
 import { ClientesPage } from './pages/Clientes/ClientesPage';
 import { ProveedoresPage } from './pages/Proveedores/ProveedoresPage';
 import { ReportesPage } from './pages/Reportes/ReportesPage';
@@ -123,6 +124,14 @@ export default function App() {
                   element={
                     <RoleRoute permission="purchases.view">
                       <ComprasPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="cuentas-corrientes"
+                  element={
+                    <RoleRoute permission="current_accounts.view">
+                      <CuentasCorrientesPage />
                     </RoleRoute>
                   }
                 />

@@ -17,4 +17,5 @@ export const COLLECTIONS = {
   LOGS: 'logs',
   PRICE_HISTORY: 'priceHistory',
   COST_HISTORY: 'costHistory',
+  CURRENT_ACCOUNTS: 'currentAccounts',
 };

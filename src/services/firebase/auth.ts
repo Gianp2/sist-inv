@@ -55,10 +55,16 @@ const notifySubscribers = (user: UserSession | null): void => {
 
 export const getStoredSession = (): UserSession | null => {
   try {
-    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY) || localStorage.getItem(SESSION_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.uid || parsed.id) && parsed.email) {
+        // Ensure both storages stay in sync
+        try {
+          if (!sessionStorage.getItem(SESSION_STORAGE_KEY)) {
+            sessionStorage.setItem(SESSION_STORAGE_KEY, raw);
+          }
+        } catch (_) {}
         return parsed;
       }
     }
@@ -71,7 +77,11 @@ export const getStoredSession = (): UserSession | null => {
 export const setStoredSession = (user: UserSession | null): void => {
   try {
     if (user) {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
+      const json = JSON.stringify(user);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, json);
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, json);
+      } catch (_) {}
     } else {
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
       try {

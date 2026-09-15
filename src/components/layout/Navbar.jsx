@@ -100,7 +100,7 @@ export function Navbar({ onMenuClick }) {
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-xl text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
+            className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-neutral-800 hover:bg-neutral-100 transition-colors cursor-pointer shrink-0"
             aria-label="Abrir menú de navegación"
           >
             <Menu className="w-5 h-5" />

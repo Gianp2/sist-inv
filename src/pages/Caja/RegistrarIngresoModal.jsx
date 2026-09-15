@@ -144,6 +144,14 @@ export function RegistrarIngresoModal({
       return;
     }
 
+    if (salePaymentMethod === 'CUENTA_CORRIENTE' && !saleCustomerId) {
+      toastAlert.warning(
+        'Cliente Requerido',
+        'Para registrar una venta a Cuenta Corriente / Fiado, debes seleccionar un cliente registrado.'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const customer = customers.find((c) => c.id === saleCustomerId);
@@ -151,6 +159,7 @@ export function RegistrarIngresoModal({
         items: cartItems,
         total: totalSaleAmount,
         paymentMethod: salePaymentMethod,
+        isCredit: salePaymentMethod === 'CUENTA_CORRIENTE',
         customerId: customer?.id || null,
         customerName: customer?.name || 'Consumidor Final',
         notes: saleNotes,
@@ -162,6 +171,8 @@ export function RegistrarIngresoModal({
       setSelectedVariantId('');
       setUnitPrice('');
       setSaleNotes('');
+      setSaleCustomerId('');
+      setSalePaymentMethod('EFECTIVO');
       onClose();
     } catch (err) {
       console.error(err);
@@ -425,24 +436,48 @@ export function RegistrarIngresoModal({
               onChange={(e) => setSaleNotes(e.target.value)}
             />
 
+            {/* Notice for Cuenta Corriente */}
+            {salePaymentMethod === 'CUENTA_CORRIENTE' && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2 text-xs text-amber-900">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-amber-950">Venta a Cuenta Corriente / Fiado</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    No ingresa dinero físico al cajón en este momento. La deuda de{' '}
+                    <strong className="font-extrabold">{formatCurrency(totalSaleAmount)}</strong> se
+                    cargará automáticamente en la cuenta del cliente seleccionado y el stock se descontará
+                    de inmediato.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Action buttons */}
-            <div className="flex items-center justify-between pt-3 border-t border-neutral-200">
-              <div className="text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-neutral-200">
+              <div className="flex items-center justify-between sm:block">
                 <p className="text-[11px] text-neutral-400 font-semibold uppercase">Total a Cobrar</p>
-                <p className="text-xl font-black text-neutral-900">
+                <p className="text-2xl sm:text-xl font-black text-neutral-900 font-mono">
                   {formatCurrency(totalSaleAmount)}
                 </p>
               </div>
 
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading}>
+              <div className="flex flex-col-reverse sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="w-full sm:w-auto h-11 sm:h-9 font-bold justify-center"
+                >
                   Cancelar
                 </Button>
                 <Button
                   type="submit"
                   variant="primary"
-                  size="sm"
+                  size="md"
                   disabled={loading || cartItems.length === 0}
+                  className="w-full sm:w-auto h-11 sm:h-9 font-black justify-center shadow-xs"
                 >
                   {loading ? 'Procesando...' : 'Confirmar Venta y Cobrar'}
                 </Button>
@@ -506,11 +541,24 @@ export function RegistrarIngresoModal({
               onChange={(e) => setDirectDate(e.target.value)}
             />
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-neutral-200">
-              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-neutral-200">
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={onClose}
+                disabled={loading}
+                className="w-full sm:w-auto h-11 sm:h-9 font-bold justify-center"
+              >
                 Cancelar
               </Button>
-              <Button type="submit" variant="primary" size="sm" disabled={loading || !directAmount}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                disabled={loading || !directAmount}
+                className="w-full sm:w-auto h-11 sm:h-9 font-black justify-center shadow-xs"
+              >
                 {loading ? 'Guardando...' : 'Guardar Ingreso'}
               </Button>
             </div>

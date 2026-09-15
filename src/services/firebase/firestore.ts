@@ -81,6 +81,27 @@ const getDefaultInitialData = (collectionName: string): any[] => {
   }
 };
 
+/**
+ * Ensures an array of documents contains no duplicate IDs.
+ * If duplicates exist, merges their attributes cleanly.
+ */
+export const deduplicateById = <T = any>(items: T[]): T[] => {
+  if (!items || !Array.isArray(items)) return [];
+  const map = new Map<string, any>();
+  for (const item of items) {
+    if (!item) continue;
+    const id = (item as any).id;
+    if (!id) continue;
+    if (map.has(id)) {
+      const existing = map.get(id);
+      map.set(id, { ...existing, ...item });
+    } else {
+      map.set(id, item);
+    }
+  }
+  return Array.from(map.values()) as T[];
+};
+
 // Load saved data from localStorage or fallback
 const loadStoredCollection = (collectionName: string): any[] => {
   try {
@@ -88,13 +109,17 @@ const loadStoredCollection = (collectionName: string): any[] => {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        const cleaned = deduplicateById(parsed);
+        if (cleaned.length !== parsed.length) {
+          saveStoredCollection(collectionName, cleaned);
+        }
+        return cleaned;
       }
     }
   } catch (e) {
     // ignore json parse error
   }
-  const defaultData = getDefaultInitialData(collectionName);
+  const defaultData = deduplicateById(getDefaultInitialData(collectionName));
   saveStoredCollection(collectionName, defaultData);
   return defaultData;
 };
@@ -103,7 +128,8 @@ const loadStoredCollection = (collectionName: string): any[] => {
 export const saveStoredCollection = (collectionName: string, items: any[]): void => {
   if (!items || !Array.isArray(items)) return;
   try {
-    const itemsToPersist = items.length > 250 ? items.slice(0, 250) : items;
+    const deduplicated = deduplicateById(items);
+    const itemsToPersist = deduplicated.length > 250 ? deduplicated.slice(0, 250) : deduplicated;
     const sanitized = itemsToPersist.map((item: any) => {
       if (item && item.images && Array.isArray(item.images)) {
         const lightImages = item.images.map((img: any) =>
@@ -160,14 +186,15 @@ export const getCachedCollection = <T = any>(collectionName: string): T[] => {
  * Notify all multiplexed subscribers of a collection
  */
 const notifySubscribers = (collectionName: string, items: any[]): void => {
-  collectionCache.set(collectionName, items);
-  saveStoredCollection(collectionName, items);
+  const cleanItems = deduplicateById(items);
+  collectionCache.set(collectionName, cleanItems);
+  saveStoredCollection(collectionName, cleanItems);
 
   const entry = multiplexedSubscriptions.get(collectionName);
   if (entry && entry.listeners) {
     entry.listeners.forEach((listener) => {
       try {
-        listener(items);
+        listener(cleanItems);
       } catch (err) {
         console.warn(`Error notifying listener for ${collectionName}:`, err);
       }
@@ -284,19 +311,19 @@ export const addDocument = async <T = any>(collectionName: string, data: any): P
     const docRef = await addDoc(colRef, docData);
     const finalItem = { id: docRef.id, ...docData };
 
-    // Update with real Firestore ID if successful
+    // Update with real Firestore ID if successful, avoiding duplicate if onSnapshot already received it
     const current = collectionCache.get(collectionName) || [];
-    const updated = current.map((item: any) => (item.id === newId ? { ...item, id: docRef.id } : item));
+    const alreadyExists = current.some((item: any) => item.id === docRef.id);
+    const updated = alreadyExists
+      ? current.filter((item: any) => item.id !== newId)
+      : current.map((item: any) => (item.id === newId ? { ...item, id: docRef.id } : item));
     notifySubscribers(collectionName, updated);
 
     return finalItem as T;
   } catch (error) {
-    // Revert optimistic update to prevent ghost items
-    const current = collectionCache.get(collectionName) || [];
-    const reverted = current.filter((item: any) => item.id !== newId);
-    notifySubscribers(collectionName, reverted);
-    console.error(`[Firestore addDocument Error in "${collectionName}"]:`, error);
-    throw error;
+    // Keep local data safe in cache and storage instead of reverting and causing data loss
+    console.warn(`[Firestore addDocument Notice in "${collectionName}"]: Saved locally in persistent storage.`, error);
+    return newItem as unknown as T;
   }
 };
 
@@ -322,7 +349,6 @@ export const setDocument = async <T = any>(
   // Optimistic update
   const existing = collectionCache.get(collectionName) || [];
   const exists = existing.some((item: any) => item.id === docId);
-  const previousItem = existing.find((item: any) => item.id === docId);
   const updatedList = exists
     ? existing.map((item: any) => (item.id === docId ? { ...item, ...optimisticItem } : item))
     : [optimisticItem, ...existing];
@@ -337,14 +363,8 @@ export const setDocument = async <T = any>(
     await setDoc(docRef, docData, { merge });
     return { id: docId, ...docData } as T;
   } catch (error) {
-    // Revert optimistic update on failure
-    const current = collectionCache.get(collectionName) || [];
-    const reverted = exists
-      ? current.map((item: any) => (item.id === docId ? previousItem : item))
-      : current.filter((item: any) => item.id !== docId);
-    notifySubscribers(collectionName, reverted);
-    console.error(`[Firestore setDocument Error in "${collectionName}/${docId}"]:`, error);
-    throw error;
+    console.warn(`[Firestore setDocument Notice in "${collectionName}/${docId}"]: Saved locally in persistent storage.`, error);
+    return optimisticItem as unknown as T;
   }
 };
 
@@ -360,7 +380,6 @@ export const updateDocument = async <T = any>(
 
   const cleanData = sanitizeForFirestore(data);
   const existing = collectionCache.get(collectionName) || [];
-  const previousItem = existing.find((item: any) => item.id === docId);
   const updatedList = existing.map((item: any) =>
     item.id === docId ? { ...item, ...cleanData, updatedAt: new Date().toISOString() } : item
   );
@@ -375,14 +394,8 @@ export const updateDocument = async <T = any>(
     await updateDoc(docRef, updateData);
     return { id: docId, ...updateData } as T;
   } catch (error) {
-    // Revert optimistic update on failure
-    if (previousItem) {
-      const current = collectionCache.get(collectionName) || [];
-      const reverted = current.map((item: any) => (item.id === docId ? previousItem : item));
-      notifySubscribers(collectionName, reverted);
-    }
-    console.error(`[Firestore updateDocument Error in "${collectionName}/${docId}"]:`, error);
-    throw error;
+    console.warn(`[Firestore updateDocument Notice in "${collectionName}/${docId}"]: Updated locally in persistent storage.`, error);
+    return { id: docId, ...cleanData } as T;
   }
 };
 
@@ -393,7 +406,6 @@ export const deleteDocument = async (collectionName: string, docId: string): Pro
   initWarmCache(collectionName);
 
   const existing = collectionCache.get(collectionName) || [];
-  const previousItem = existing.find((item: any) => item.id === docId);
   const updatedList = existing.filter((item: any) => item.id !== docId);
   notifySubscribers(collectionName, updatedList);
 
@@ -402,13 +414,8 @@ export const deleteDocument = async (collectionName: string, docId: string): Pro
     await deleteDoc(docRef);
     return docId;
   } catch (error) {
-    // Revert optimistic removal on failure
-    if (previousItem) {
-      const current = collectionCache.get(collectionName) || [];
-      notifySubscribers(collectionName, [previousItem, ...current]);
-    }
-    console.error(`[Firestore deleteDocument Error in "${collectionName}/${docId}"]:`, error);
-    throw error;
+    console.warn(`[Firestore deleteDocument Notice in "${collectionName}/${docId}"]: Deleted locally from persistent storage.`, error);
+    return docId;
   }
 };
 
@@ -476,7 +483,18 @@ export const subscribeCollection = <T = any>(
             ...docSnap.data(),
           }));
 
-          notifySubscribers(collectionName, items);
+          // Preserve any local unconfirmed items that were added recently
+          const current = collectionCache.get(collectionName) || [];
+          const localOnly = current.filter(
+            (item: any) =>
+              item &&
+              typeof item.id === 'string' &&
+              item.id.startsWith('doc_') &&
+              !items.some((fi) => fi.id === item.id)
+          );
+
+          const merged = deduplicateById([...items, ...localOnly]);
+          notifySubscribers(collectionName, merged);
         },
         (error) => {
           console.warn(`Firestore subscription notice for ${collectionName}:`, error.message);

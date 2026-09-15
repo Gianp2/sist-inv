@@ -27,7 +27,7 @@ export function QuickActions() {
           size="sm"
           leftIcon={act.icon}
           onClick={act.onClick}
-          className="w-full sm:w-auto justify-center text-xs h-9.5 font-bold"
+          className="w-full sm:w-auto justify-center text-xs h-11 sm:h-9.5 font-bold"
         >
           {act.label}
         </Button>

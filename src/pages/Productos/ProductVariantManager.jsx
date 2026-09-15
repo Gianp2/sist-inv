@@ -26,10 +26,14 @@ export function ProductVariantManager({ variants = [], onChange, baseSku = '' })
 
   // Automatically generate combination matrix (e.g. Negro S, Negro M, Blanco S, Blanco M)
   const generateMatrix = () => {
-    if (selectedSizes.length === 0 || selectedColors.length === 0) return;
+    if (selectedSizes.length === 0) return;
+
+    const colorsToUse = selectedColors.length > 0 
+      ? selectedColors 
+      : [{ name: 'Único', hex: '#64748b' }];
 
     const newVariants = [];
-    selectedColors.forEach((color) => {
+    colorsToUse.forEach((color) => {
       selectedSizes.forEach((size) => {
         const variantId = `v_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         const colorCode = color.name.substring(0, 3).toUpperCase();
@@ -43,7 +47,7 @@ export function ProductVariantManager({ variants = [], onChange, baseSku = '' })
             color: color.name,
             colorHex: color.hex,
             size,
-            stock: 5,
+            stock: 1,
             sku,
           });
         }
@@ -175,15 +179,15 @@ export function ProductVariantManager({ variants = [], onChange, baseSku = '' })
           </div>
         </div>
 
-        {selectedSizes.length > 0 && selectedColors.length > 0 && (
+        {selectedSizes.length > 0 && (
           <Button
             type="button"
             variant="primary"
-            size="xs"
-            className="w-full"
+            size="sm"
+            className="w-full h-10 font-bold justify-center"
             onClick={generateMatrix}
           >
-            Generar {selectedSizes.length * selectedColors.length} Combinaciones
+            Generar {selectedSizes.length * (selectedColors.length || 1)} Combinación(es)
           </Button>
         )}
       </div>
@@ -193,7 +197,7 @@ export function ProductVariantManager({ variants = [], onChange, baseSku = '' })
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {variants.map((variant, idx) => (
             <div
-              key={variant.id || idx}
+              key={variant.id ? `${variant.id}-${idx}` : `var-${idx}`}
               className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-neutral-200 shadow-2xs"
             >
               <div className="flex items-center gap-2">

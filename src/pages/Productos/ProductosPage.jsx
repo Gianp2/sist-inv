@@ -208,12 +208,12 @@ export function ProductosPage() {
               size="sm"
               leftIcon={Trash2}
               onClick={() => setConfirmClearOpen(true)}
-              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-neutral-200"
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-neutral-200 text-xs h-10 sm:h-9"
             >
               Vaciar Prendas
             </Button>
           )}
-          <Button variant="outline" size="sm" leftIcon={Download} onClick={handleExportExcel}>
+          <Button variant="outline" size="sm" leftIcon={Download} onClick={handleExportExcel} className="text-xs h-10 sm:h-9">
             Exportar Excel
           </Button>
           {can('pricing.manage') && (
@@ -222,14 +222,20 @@ export function ProductosPage() {
               size="sm"
               leftIcon={TrendingUp}
               onClick={() => navigate('/revision-precios')}
-              className="border-neutral-300 text-neutral-800 hover:bg-neutral-50"
+              className="border-neutral-300 text-neutral-800 hover:bg-neutral-50 text-xs h-10 sm:h-9"
             >
               Revisión de Precios
             </Button>
           )}
           {can('products.create') && (
-            <Button variant="primary" size="sm" leftIcon={Plus} onClick={handleOpenCreate}>
-              Nuevo Producto
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={Plus}
+              onClick={handleOpenCreate}
+              className="w-full sm:w-auto h-11 sm:h-9 text-xs font-black justify-center shadow-xs"
+            >
+              + Nueva Prenda
             </Button>
           )}
         </div>
@@ -257,8 +263,8 @@ export function ProductosPage() {
           <>
             {/* Mobile View: Clean Touch-Friendly Cards */}
             <div className="md:hidden divide-y divide-neutral-200">
-              {paginatedProducts.map((p) => (
-                <div key={p.id} className="p-4 space-y-3">
+              {paginatedProducts.map((p, pIdx) => (
+                <div key={p.id ? `${p.id}-${pIdx}` : `prod-${pIdx}`} className="p-4 space-y-3">
                   <div className="flex items-center gap-3">
                     <ProductVisualBadge product={p} size="lg" />
                     <div className="flex-1 min-w-0">
@@ -317,26 +323,26 @@ export function ProductosPage() {
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
                     <button
                       onClick={() => setViewingProduct(p)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                      className="min-h-[40px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-4 h-4" />
                       <span>Ver</span>
                     </button>
                     {can('products.edit') && (
                       <button
                         onClick={() => handleOpenEdit(p)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                        className="min-h-[40px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                       >
-                        <Edit2 className="w-3.5 h-3.5" />
+                        <Edit2 className="w-4 h-4" />
                         <span>Editar</span>
                       </button>
                     )}
                     {can('products.delete') && (
                       <button
                         onClick={() => setDeletingId(p.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
+                        className="min-h-[40px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                         <span>Eliminar</span>
                       </button>
                     )}
@@ -364,8 +370,8 @@ export function ProductosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
-                {paginatedProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-neutral-50/80 transition-colors">
+                {paginatedProducts.map((p, pIdx) => (
+                  <tr key={p.id ? `${p.id}-${pIdx}` : `prod-${pIdx}`} className="hover:bg-neutral-50/80 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <ProductVisualBadge product={p} size="sm" />

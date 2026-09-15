@@ -350,7 +350,7 @@ export function ProductDetailModal({ isOpen, onClose, product, onEdit, priceHist
                         const diffPct = prev > 0 ? ((diff / prev) * 100).toFixed(1) : null;
 
                         return (
-                          <tr key={item.id || idx} className="hover:bg-neutral-50">
+                          <tr key={item.id ? `${item.id}-${idx}` : `ph-${idx}`} className="hover:bg-neutral-50">
                             <td className="p-2.5 font-bold text-neutral-800">
                               {formatDate(item.date, 'short')} {item.time ? `• ${item.time}` : ''}
                             </td>
@@ -415,7 +415,7 @@ export function ProductDetailModal({ isOpen, onClose, product, onEdit, priceHist
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
                         {cHist.map((item, idx) => (
-                          <tr key={item.id || idx} className="hover:bg-neutral-50">
+                          <tr key={item.id ? `${item.id}-${idx}` : `ch-${idx}`} className="hover:bg-neutral-50">
                             <td className="p-2.5 font-bold text-neutral-800">
                               {formatDate(item.date, 'short')} {item.time ? `• ${item.time}` : ''}
                             </td>

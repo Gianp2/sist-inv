@@ -614,13 +614,13 @@ export default function RevisionPreciosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
-              {filteredProducts.map((p) => {
+              {filteredProducts.map((p, idx) => {
                 const isSelected = selectedIds.has(p.id);
                 const isStagnant = p.aging.isStagnant;
 
                 return (
                   <tr
-                    key={p.id}
+                    key={p.id ? `${p.id}-${idx}` : `rev-${idx}`}
                     className={`hover:bg-neutral-50/80 transition-colors ${
                       isSelected ? 'bg-amber-50/40' : isStagnant ? 'bg-rose-50/20' : ''
                     }`}

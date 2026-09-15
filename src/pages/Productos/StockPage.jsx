@@ -213,9 +213,9 @@ export function StockPage() {
         {loading ? (
           <TableSkeleton rows={5} cols={4} />
         ) : (
-          paginatedProducts.map((product) => (
+          paginatedProducts.map((product, pIdx) => (
             <div
-              key={product.id}
+              key={product.id ? `${product.id}-${pIdx}` : `prod-${pIdx}`}
               className="card-panel p-5 rounded-2xl bg-white border border-neutral-200 shadow-xs space-y-4"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200 pb-3">
@@ -277,7 +277,7 @@ export function StockPage() {
 
                   return (
                     <div
-                      key={v.id || idx}
+                      key={v.id ? `${product.id}-${v.id}-${idx}` : `var-${product.id}-${idx}`}
                       className="flex items-center justify-between p-3 rounded-xl bg-white border border-neutral-200 shadow-2xs"
                     >
                       <div className="flex items-center gap-2">
