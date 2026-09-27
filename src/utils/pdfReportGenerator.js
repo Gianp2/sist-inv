@@ -34,8 +34,8 @@ export function generateMonthlyReportPDF({
     const periodTitle = `${monthName.toUpperCase()} ${year}`;
 
     // Store / Business info
-    const storeName = businessInfo?.businessName || businessInfo?.name || 'TIENDA DE ROPA - GESTIÓN COMERCIAL';
-    const storeAddress = businessInfo?.address || '';
+    const rawStoreName = businessInfo?.businessName || businessInfo?.name || 'SISTEMA DE GESTIÓN COMERCIAL';
+    const storeName = /dual/i.test(rawStoreName) ? 'SISTEMA DE GESTIÓN COMERCIAL' : rawStoreName;
     const storePhone = businessInfo?.phone || '';
     const storeCuit = businessInfo?.cuit ? `CUIT: ${businessInfo.cuit}` : '';
     const storeEmail = businessInfo?.email || '';
@@ -146,8 +146,8 @@ export function generateMonthlyReportPDF({
       docInstance.setFont('helvetica', 'normal');
       docInstance.setFontSize(8.5);
       docInstance.setTextColor(100, 116, 139);
-      const contactParts = [storeAddress, storePhone, storeCuit, storeEmail].filter(Boolean);
-      docInstance.text(contactParts.join('  •  ') || 'Sistema de Gestion de Indumentaria y Calzado', 14, 21);
+      const contactParts = [storePhone, storeCuit, storeEmail].filter(Boolean);
+      docInstance.text(contactParts.join('  •  ') || 'Sistema de Gestión Comercial', 14, 21);
 
       // Report Title Box
       docInstance.setFillColor(248, 250, 252);

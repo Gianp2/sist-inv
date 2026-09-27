@@ -18,8 +18,8 @@ export const ROLE_LABELS = {
 export const SYSTEM_MODULES = [
   {
     id: 'products',
-    name: 'Productos y Prendas',
-    description: 'Catálogo de indumentaria, precios, talles y variantes de color',
+    name: 'Productos y Artículos',
+    description: 'Catálogo de productos, precios, talles y variantes de color',
     actions: ['view', 'create', 'edit', 'delete'],
     extraPermissions: [
       { id: 'costs.view', label: 'Ver Costos y Ganancias' },
@@ -36,13 +36,13 @@ export const SYSTEM_MODULES = [
   {
     id: 'categories',
     name: 'Categorías',
-    description: 'Clasificación de prendas (Remeras, Pantalones, Camperas, etc.)',
+    description: 'Clasificación de productos y rubros',
     actions: ['view', 'create', 'edit', 'delete'],
   },
   {
     id: 'brands',
     name: 'Marcas',
-    description: 'Marcas y fabricantes de indumentaria',
+    description: 'Marcas y fabricantes',
     actions: ['view', 'create', 'edit', 'delete'],
   },
   {

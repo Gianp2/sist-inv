@@ -27,7 +27,15 @@ export function ConfiguracionPage() {
   // Sync form data whenever settings finishes loading or updates in Firestore
   useEffect(() => {
     if (settings) {
-      setFormData(settings);
+      const cleanBusinessName = /dual/i.test(settings.businessName || '')
+        ? 'Sistema Inv'
+        : (settings.businessName || 'Sistema Inv');
+      setFormData({
+        ...settings,
+        businessName: cleanBusinessName,
+        legalName: /dual/i.test(settings.legalName || '') ? 'Sistema Inv' : (settings.legalName || ''),
+        address: '', // address completely cleared
+      });
     }
   }, [settings]);
 
@@ -112,7 +120,7 @@ export function ConfiguracionPage() {
             <div>
               <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
                 <Store className="w-5 h-5 text-neutral-800" />
-                Datos de la Tienda de Ropa
+                Datos del Negocio
               </h2>
               <p className="text-xs text-neutral-500 mt-0.5 font-medium">
                 Esta información define el nombre del sistema, la barra lateral, los tickets impresos y los reportes PDF.
@@ -143,12 +151,6 @@ export function ConfiguracionPage() {
               value={formData.cuit || ''}
               onChange={(e) => handleChange('cuit', e.target.value)}
               placeholder="Ej: 30-71234567-8"
-            />
-            <Input
-              label="Dirección del Local Físico"
-              value={formData.address || ''}
-              onChange={(e) => handleChange('address', e.target.value)}
-              placeholder="Ej: Av. Santa Fe 1820, Local 4"
             />
             <Input
               label="Teléfono / WhatsApp de Contacto"
@@ -202,11 +204,6 @@ export function ConfiguracionPage() {
                 {formData.cuit && (
                   <p className="text-[11px] text-neutral-600 font-semibold">
                     CUIT/RUT: {formData.cuit}
-                  </p>
-                )}
-                {formData.address && (
-                  <p className="text-[11px] text-neutral-600">
-                    {formData.address}
                   </p>
                 )}
                 {(formData.phone || formData.email) && (
@@ -268,7 +265,7 @@ export function ConfiguracionPage() {
                         Poblar Catálogo de Muestra
                       </h4>
                       <p className="text-xs text-neutral-600 mt-0.5 font-medium">
-                        Genera productos, talles y categorías de indumentaria base si el catálogo está vacío.
+                        Genera productos, talles y categorías base si el catálogo está vacío.
                       </p>
                     </div>
                   </div>
@@ -331,7 +328,7 @@ export function ConfiguracionPage() {
                       Restablecer Todo el Sistema a Cero (Limpieza Total)
                     </h4>
                     <p className="text-xs text-neutral-600 mt-0.5 font-medium">
-                      Elimina todas las prendas de muestra, clientes, proveedores, compras y ventas para dejar la tienda 100% nueva y vacía.
+                      Elimina todos los productos de muestra, clientes, proveedores, compras y ventas para dejar la tienda 100% nueva y vacía.
                     </p>
                   </div>
                 </div>
@@ -371,7 +368,7 @@ export function ConfiguracionPage() {
         onClose={() => setConfirmSeedOpen(false)}
         onConfirm={handleConfirmSeed}
         title="¿Poblar datos de muestra?"
-        description="Se cargarán productos, talles, variantes y categorías de indumentaria de ejemplo para comenzar a operar."
+        description="Se cargarán productos, talles, variantes y categorías de ejemplo para comenzar a operar."
         confirmText="Sí, Cargar Muestra"
         variant="primary"
         isLoading={isSeeding}
@@ -395,7 +392,7 @@ export function ConfiguracionPage() {
         onClose={() => setConfirmResetAllOpen(false)}
         onConfirm={handleConfirmResetAll}
         title="¿Restablecer todo el sistema a cero?"
-        description="Se eliminarán todas las prendas de muestra, talles, stock, ventas, compras, clientes y caja para dejar el sistema totalmente limpio y nuevo para su uso real."
+        description="Se eliminarán todos los productos de muestra, talles, stock, ventas, compras, clientes y caja para dejar el sistema totalmente limpio y nuevo para su uso real."
         confirmText="Sí, Restablecer Todo a Cero"
         variant="danger"
         isLoading={isResettingAll}

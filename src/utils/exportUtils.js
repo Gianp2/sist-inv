@@ -28,8 +28,8 @@ export const exportTableToPDF = ({
 }) => {
   try {
     const doc = new jsPDF();
-    const storeName = businessInfo?.businessName || businessInfo?.name || 'Tienda de Ropa - Sistema de Gestión';
-    const storeAddress = businessInfo?.address || '';
+    const rawStoreName = businessInfo?.businessName || businessInfo?.name || 'Sistema Inv';
+    const storeName = /dual/i.test(rawStoreName) ? 'Sistema Inv' : rawStoreName;
     const storePhone = businessInfo?.phone || '';
 
     // Header styling
@@ -39,8 +39,8 @@ export const exportTableToPDF = ({
 
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    if (storeAddress || storePhone) {
-      doc.text(`${storeAddress} ${storePhone ? '| Tel: ' + storePhone : ''}`, 14, 24);
+    if (storePhone) {
+      doc.text(`Tel: ${storePhone}`, 14, 24);
     }
 
     doc.setFontSize(14);

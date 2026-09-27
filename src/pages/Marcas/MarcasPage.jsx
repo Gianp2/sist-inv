@@ -59,7 +59,7 @@ export function MarcasPage() {
             Marcas
           </h1>
           <p className="text-xs text-neutral-500 mt-0.5 font-medium">
-            Gestión de marcas y fabricantes de indumentaria
+            Gestión de marcas y fabricantes
           </p>
         </div>
         {can('brands.create') && (

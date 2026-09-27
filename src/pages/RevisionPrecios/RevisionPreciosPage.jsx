@@ -298,7 +298,7 @@ export default function RevisionPreciosPage() {
       MotivoRevisión: p.suggestion.reviewReason,
     }));
 
-    exportToExcel(data, 'Revision_Precios_Indumentaria.xlsx', 'RevisionPrecios');
+    exportToExcel(data, 'Revision_Precios.xlsx', 'RevisionPrecios');
     toast.success('Reporte exportado exitosamente');
   };
 

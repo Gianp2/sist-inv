@@ -13,19 +13,32 @@ const SettingsContext = createContext(null);
 
 const SETTINGS_STORAGE_KEY = 'sistemainv_settings_cache';
 
+const cleanStoreSettings = (raw) => {
+  if (!raw || typeof raw !== 'object') return raw;
+  const cleaned = { ...raw };
+  if (typeof cleaned.businessName === 'string' && /dual/i.test(cleaned.businessName)) {
+    cleaned.businessName = 'Sistema Inv';
+  }
+  if (typeof cleaned.legalName === 'string' && /dual/i.test(cleaned.legalName)) {
+    cleaned.legalName = 'Sistema Inv';
+  }
+  cleaned.address = '';
+  return cleaned;
+};
+
 const getInitialCachedSettings = () => {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        return { ...INITIAL_SETTINGS, ...parsed };
+        return cleanStoreSettings({ ...INITIAL_SETTINGS, ...parsed });
       }
     }
   } catch (e) {
     // ignore
   }
-  return INITIAL_SETTINGS;
+  return cleanStoreSettings(INITIAL_SETTINGS);
 };
 
 export function SettingsProvider({ children }) {
@@ -40,11 +53,18 @@ export function SettingsProvider({ children }) {
     getDocument(COLLECTIONS.SETTINGS, 'general')
       .then((data) => {
         if (isMounted && data) {
-          const merged = { ...INITIAL_SETTINGS, ...data };
-          setSettings(merged);
+          const rawMerged = { ...INITIAL_SETTINGS, ...data };
+          const hadDual = /dual/i.test(rawMerged.businessName || '') || /dual/i.test(rawMerged.legalName || '');
+          const hadAddress = Boolean(rawMerged.address && rawMerged.address.trim());
+          const cleaned = cleanStoreSettings(rawMerged);
+          setSettings(cleaned);
           try {
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(cleaned));
           } catch (_) {}
+          // Silently clean Firestore document if it previously contained Dual or an address
+          if (hadDual || hadAddress) {
+            setDocument(COLLECTIONS.SETTINGS, 'general', cleaned).catch(() => {});
+          }
         }
       })
       .catch((err) => {
@@ -63,10 +83,10 @@ export function SettingsProvider({ children }) {
         if (data && data.length > 0) {
           const generalDoc = data.find((d) => d.id === 'general') || data[0];
           if (generalDoc) {
-            const merged = { ...INITIAL_SETTINGS, ...generalDoc };
-            setSettings(merged);
+            const cleaned = cleanStoreSettings({ ...INITIAL_SETTINGS, ...generalDoc });
+            setSettings(cleaned);
             try {
-              localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+              localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(cleaned));
             } catch (_) {}
           }
         }
@@ -86,9 +106,10 @@ export function SettingsProvider({ children }) {
 
   // Synchronize browser tab title with current business name
   useEffect(() => {
-    if (settings?.businessName) {
-      document.title = `${settings.businessName} - Sistema de Gestión`;
-    }
+    const titleName = (settings?.businessName && !/dual/i.test(settings.businessName))
+      ? settings.businessName
+      : 'Sistema Inv';
+    document.title = `${titleName} - Sistema de Gestión`;
   }, [settings?.businessName]);
 
   // Persist updated settings to Firestore & Cache with instant optimistic update
@@ -101,15 +122,16 @@ export function SettingsProvider({ children }) {
       else if (currencyCode === 'MXN') currencySymbol = '$';
       else if (currencyCode === 'CLP') currencySymbol = '$';
 
-      const enriched = {
+      const enriched = cleanStoreSettings({
         ...INITIAL_SETTINGS,
         ...settings,
         ...newSettings,
         currency: currencyCode,
         currencyCode,
         currencySymbol,
+        address: '', // address completely removed from system
         updatedAt: new Date().toISOString(),
-      };
+      });
 
       // Optimistic instant state update across all components
       setSettings(enriched);
@@ -127,15 +149,21 @@ export function SettingsProvider({ children }) {
     }
   }, [settings]);
 
+  const cleanBusinessName = useMemo(() => {
+    const raw = settings?.businessName;
+    if (!raw || /dual/i.test(raw)) return 'Sistema Inv';
+    return raw;
+  }, [settings?.businessName]);
+
   const value = useMemo(
     () => ({
       settings,
       loading,
       saveSettings,
-      businessName: settings?.businessName || 'Sistema Inv',
+      businessName: cleanBusinessName,
       currencySymbol: settings?.currencySymbol || '$',
     }),
-    [settings, loading, saveSettings]
+    [settings, loading, saveSettings, cleanBusinessName]
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

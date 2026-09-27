@@ -14,7 +14,8 @@ export function DashboardPage() {
   const { allMovements, loading: cashLoading } = useCashRegister();
   const { settings } = useSettings();
   const { can, roleLabel, user } = useAuth();
-  const storeName = settings?.businessName || 'Sistema Inv';
+  const rawStoreName = settings?.businessName || 'Sistema Inv';
+  const storeName = /dual/i.test(rawStoreName) ? 'Sistema Inv' : rawStoreName;
   const canSeeFinancials = can('dashboard.financials');
 
   if (productsLoading || cashLoading) {
@@ -66,7 +67,7 @@ export function DashboardPage() {
             Panel de Control
           </h1>
           <p className="text-xs text-neutral-500 mt-0.5">
-            Gestión comercial de <strong className="font-semibold text-neutral-700">{storeName}</strong> • {settings?.address || 'Control de stock y caja'}
+            Gestión comercial y control general de stock, caja y cuentas corrientes
           </p>
         </div>
         <QuickActions />

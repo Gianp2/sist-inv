@@ -1,4 +1,5 @@
 import React from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { sanitizeNumericValue, handleNumericFocus } from '../../utils/numericUtils';
 
@@ -10,6 +11,7 @@ export const Input = React.forwardRef(
       helperText,
       leftIcon: LeftIcon,
       rightIcon: RightIcon,
+      showPasswordToggle = false,
       className = '',
       id,
       type,
@@ -21,8 +23,11 @@ export const Input = React.forwardRef(
     },
     ref
   ) => {
+    const [showPassword, setShowPassword] = React.useState(false);
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
     const isNumeric = type === 'number';
+    const isPassword = type === 'password';
+    const effectiveType = isPassword && showPassword ? 'text' : type;
 
     const handleFocusInternal = (e) => {
       if (isNumeric) {
@@ -83,7 +88,7 @@ export const Input = React.forwardRef(
           <input
             id={inputId}
             ref={ref}
-            type={type}
+            type={effectiveType}
             value={displayValue}
             onChange={handleChangeInternal}
             onInput={handleInputInternal}
@@ -92,7 +97,7 @@ export const Input = React.forwardRef(
               'w-full rounded-xl border bg-white px-3.5 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 transition-all duration-150',
               'focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent',
               LeftIcon ? 'pl-9' : 'pl-3.5',
-              RightIcon ? 'pr-9' : 'pr-3.5',
+              (RightIcon || (isPassword && showPasswordToggle)) ? 'pr-10' : 'pr-3.5',
               error
                 ? 'border-rose-500 focus:ring-rose-500'
                 : 'border-neutral-300 hover:border-neutral-400 focus:border-neutral-900',
@@ -100,11 +105,26 @@ export const Input = React.forwardRef(
             )}
             {...props}
           />
-          {RightIcon && (
+          {isPassword && showPasswordToggle ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 p-0.5 text-neutral-400 hover:text-neutral-700 focus:outline-none cursor-pointer transition-colors"
+              title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+            >
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
+          ) : RightIcon ? (
             <div className="absolute right-3 pointer-events-none text-neutral-400">
               <RightIcon className="w-4 h-4" />
             </div>
-          )}
+          ) : null}
         </div>
         {error && <p className="text-xs text-rose-600 font-semibold">{error}</p>}
         {helperText && !error && (

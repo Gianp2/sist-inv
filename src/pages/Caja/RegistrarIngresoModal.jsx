@@ -215,7 +215,7 @@ export function RegistrarIngresoModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Registrar Ingreso de Dinero"
-      subtitle="Venta de indumentaria con descuento de stock o ingreso libre"
+      subtitle="Venta con descuento de stock o ingreso libre"
       maxWidth="max-w-2xl"
     >
       <div className="space-y-4">

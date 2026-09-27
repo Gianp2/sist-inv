@@ -84,7 +84,7 @@ service cloud.firestore {
 
     // SETTINGS COLLECTION (General store & Cloudinary config - Admin only write)
     match /settings/{settingId} {
-      allow read: if isAuthenticated() && isActive();
+      allow read: if true;
       allow write: if hasPermission('settings.edit', isAdmin());
     }
 

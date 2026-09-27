@@ -12,7 +12,7 @@ import { ROLES } from '../../constants/roles';
 
 export function Navbar({ onMenuClick }) {
   const { user, roleLabel, isOwner } = useAuth();
-  const { settings } = useSettings();
+  const { settings, businessName } = useSettings();
   const { isCashOpen } = useCashRegister();
   const { products = [] } = useProducts();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -106,8 +106,8 @@ export function Navbar({ onMenuClick }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="lg:hidden flex items-center min-w-0">
-            <span className="text-xs font-bold text-neutral-900 truncate max-w-[110px]" title={settings?.businessName || 'Sistema Inv'}>
-              {settings?.businessName || 'Sistema Inv'}
+            <span className="text-xs font-bold text-neutral-900 truncate max-w-[110px]" title={businessName}>
+              {businessName}
             </span>
           </div>
           <div className="hidden sm:block">

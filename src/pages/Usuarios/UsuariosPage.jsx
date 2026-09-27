@@ -476,6 +476,7 @@ export function UsuariosPage() {
             placeholder="Mínimo 6 caracteres"
             value={newUserForm.password}
             onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+            showPasswordToggle
             required
           />
 

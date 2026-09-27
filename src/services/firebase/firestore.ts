@@ -18,7 +18,8 @@ import {
   Unsubscribe,
   DocumentData,
 } from 'firebase/firestore';
-import { db } from './config';
+import { db, persistencePromise, enableIndexedDbPersistence, enableMultiTabIndexedDbPersistence } from './config';
+export { persistencePromise, enableIndexedDbPersistence, enableMultiTabIndexedDbPersistence };
 import {
   INITIAL_CATEGORIES,
   INITIAL_SETTINGS,

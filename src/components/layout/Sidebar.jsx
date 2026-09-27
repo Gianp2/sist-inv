@@ -29,8 +29,9 @@ import { ROLES, ROLE_LABELS } from '../../constants/roles';
 export function Sidebar({ isCollapsed, toggleSidebar, mobileOpen, setMobileOpen }) {
   const { user, role, roleLabel, isOwner, isEmployee, can, logout } = useAuth();
   const { settings } = useSettings();
-  const storeName = settings?.businessName || 'Sistema Inv';
-  const storeSubtitle = settings?.address || 'Control de Stock & Caja';
+  const rawStoreName = settings?.businessName || 'Sistema Inv';
+  const storeName = /dual/i.test(rawStoreName) ? 'Sistema Inv' : rawStoreName;
+  const storeSubtitle = 'Control de Stock & Caja';
 
   // Mobile background scroll locking logic
   useEffect(() => {
